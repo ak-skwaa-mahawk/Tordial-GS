@@ -5,7 +5,7 @@ and LongHorizonEvaluator metrics into OpenAI/xAI-compatible tool schemas.
 import os
 import json
 from typing import Dict, Any, List, Optional
-from core.director.scientific_director import ScientificDirector
+from core.director.planner import ScientificDirector
 from core.bridge.worker_pool import WorkerBridge
 
 
