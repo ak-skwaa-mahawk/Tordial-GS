@@ -45,3 +45,20 @@ def test_telemetry_emitter_dispatch():
     emitter = TelemetryEmitter(host="127.0.0.1", port=9999)
     # Ensure dispatch does not raise exceptions even without active listeners
     emitter.emit("invariant_check", {"fidelity": 0.995, "status": "VERIFIED"})
+
+def test_scientific_director_failure_recovery():
+    director = ScientificDirector(plan_id="EXP-RECOVERY", max_retries=1)
+    director.add_step("H1", "Initial Step", {"lr": 0.01})
+    director.record_outcome("H1", "FAILED", error="Numerical Divergence")
+
+    # Diagnostic node was dynamically inserted
+    assert "H1_diag_1" in director.nodes
+    diag_node = director.nodes["H1_diag_1"]
+    assert diag_node.status == "PENDING"
+    assert "H1_diag_1" in director.nodes["H1"].dependencies
+
+    # Complete diagnostic, then retry H1
+    director.record_outcome("H1_diag_1", "VERIFIED", {"adjusted_lr": 0.001})
+    ready = director.get_executable_nodes()
+    assert len(ready) == 1
+    assert ready[0].node_id == "H1"
