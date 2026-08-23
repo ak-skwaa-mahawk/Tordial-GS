@@ -128,3 +128,34 @@ def test_deadlock_detection():
     status = director.detect_deadlock()
     assert status["is_deadlocked"] is True
     assert status["has_cycles"] is True
+
+@pytest.mark.asyncio
+async def test_worker_bridge_code_string_execution():
+    bridge = WorkerBridge(max_concurrency=2, sandbox_timeout=5.0)
+    code = """
+import json
+print("Worker computing physical constants...")
+metrics = {"damping": 0.125, "frequency": 4.712}
+print(f"__METRICS__={json.dumps(metrics)}")
+print("Task Complete")
+"""
+    res = await bridge.execute_task("TASK-CODE-001", code)
+    assert res["status"] == "SUCCESS"
+    assert res["exit_code"] == 0
+    assert res["metrics"]["damping"] == 0.125
+    assert res["metrics"]["frequency"] == 4.712
+    assert "Task Complete" in res["compressed_context"]
+
+@pytest.mark.asyncio
+async def test_worker_bridge_code_string_error_compression():
+    bridge = WorkerBridge(max_concurrency=2, sandbox_timeout=5.0)
+    failing_code = """
+def solve():
+    raise ZeroDivisionError("division by zero in solver")
+solve()
+"""
+    res = await bridge.execute_task("TASK-CODE-ERR", failing_code)
+    assert res["status"] == "FAILED"
+    assert res["exit_code"] != 0
+    assert "ZeroDivisionError" in res["compressed_context"]
+    assert len(res["compressed_context"]) < 120
