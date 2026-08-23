@@ -73,14 +73,19 @@ class XAIBridgeEngine:
             plan_id = arguments.get("plan_id", "DEFAULT_PLAN")
             director = self.get_or_create_director(plan_id)
             node_id = arguments["node_id"]
+            hypothesis = arguments.get("hypothesis", "")
+            parameters = arguments.get("parameters", {})
+            dependencies = arguments.get("dependencies", [])
+
             director.add_step(
-                node_id=arguments["node_id"],
-                hypothesis=arguments["hypothesis"],
-                parameters=arguments.get("parameters", {}),
-                dependencies=arguments.get("dependencies", [])
+                node_id=node_id,
+                hypothesis=hypothesis,
+                parameters=parameters,
+                dependencies=dependencies
             )
             node = director.nodes[node_id]
             executable_node_ids = [n.node_id for n in director.get_executable_nodes()]
+
             return {
                 "status": "NODE_REGISTERED",
                 "plan_id": plan_id,
@@ -89,6 +94,7 @@ class XAIBridgeEngine:
                 "dependencies": node.dependencies,
                 "executable_now": node.node_id in executable_node_ids
             }
+
         elif tool_name == "sandbox_execute":
             task_id = arguments.get("task_id", "task_0")
             code = arguments.get("code", "")
@@ -100,25 +106,29 @@ class XAIBridgeEngine:
                 "metrics": exec_res.get("metrics", {}),
                 "execution_time": exec_res.get("execution_time", 0.0)
             }
+
         elif tool_name == "get_trajectory_status":
             plan_id = arguments.get("plan_id", "DEFAULT_PLAN")
             director = self.get_or_create_director(plan_id)
             deadlock_res = director.detect_deadlock()
+
             if isinstance(deadlock_res, dict):
                 is_deadlocked = deadlock_res.get("is_deadlocked", False)
-                cycle_info = deadlock_res.get("cycle_info", [])
+                cycle_info = deadlock_res.get("cycle_info", deadlock_res.get("cycles", []))
             elif isinstance(deadlock_res, (list, tuple)):
                 is_deadlocked = deadlock_res[0] if isinstance(deadlock_res[0], bool) else False
                 cycle_info = deadlock_res[1] if len(deadlock_res) > 1 else []
             else:
                 is_deadlocked = bool(deadlock_res)
                 cycle_info = []
+
             return {
                 "plan_id": plan_id,
                 "nodes": list(director.nodes.keys()),
                 "executable_nodes": [n.node_id for n in director.get_executable_nodes()],
-                "is_deadlocked": is_deadlocked,
+                "is_deadlocked": bool(is_deadlocked),
                 "cycle_info": cycle_info
             }
+
         else:
-            return {"status": "ERROR", "message": f"Unknown tool: {tool_name}"}
+           return {"status": "ERROR", "message": f\Unknown tool: {tool_name}"}
