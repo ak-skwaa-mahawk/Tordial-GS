@@ -105,7 +105,7 @@ class XAIBridgeEngine:
         if tool_name == "scientific_director_plan":
             plan_id = arguments.get("plan_id", "DEFAULT_PLAN")
             director = self.get_or_create_director(plan_id)
-            node = director.add_step(
+            director.add_step(
                 node_id=arguments["node_id"],
                 hypothesis=arguments["hypothesis"],
                 parameters=arguments.get("parameters", {}),
@@ -114,7 +114,7 @@ class XAIBridgeEngine:
             return {
                 "status": "NODE_REGISTERED",
                 "plan_id": plan_id,
-                "node_id": node.node_id,
+                "node_id": node_id,
                 "hypothesis": node.hypothesis,
                 "dependencies": node.dependencies,
                 "executable_now": node.node_id in [n.node_id for n in director.get_executable_nodes()]
