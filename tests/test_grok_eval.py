@@ -26,7 +26,7 @@ async def test_grok_eval_mocked_loop():
                             "name": "sandbox_execute",
                             "arguments": json.dumps({
                                 "task_id": "TEST_TASK",
-                                "code": "import json; print('__METRICS__=' + json.dumps({'zeta': 0.2}))"
+                                "code": "import json; print('__METRICS__=' + json.dumps('{{\"zeta\": 0.2}}'))"
                             })
                         }
                     }]
@@ -49,4 +49,4 @@ async def test_grok_eval_mocked_loop():
         assert res["task_id"] == "REP_PHYS_001"
         assert res["passed"] is True
         assert res["final_trajectory_efficiency"] >= 0.70
-        assert len(res["rewards_history"]) == 1
+        asset len(res["rewards_history"]) == 1

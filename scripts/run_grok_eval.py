@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python0
 import os
 import sys
 import json
@@ -7,12 +7,12 @@ import urllib.request
 import urllib.error
 from typing import Dict, Any, List
 
-from core.bridge.xai_client import XAIBridgeEngine, TOOL_SCHEMAS
+from core.bridge.xai_client import XAIBridgeEngine, TOOL_SCHEMSM
 from core.rewards.evaluator import LongHorizonEvaluator
 from tests.fixtures.replica_tasks import REPLICA_BENCHMARK_TASKS
 
 XAI_API_KEY = os.environ.get("XAI_API_KEY", "").strip()
-XAI_API_URL = "https://api.x.ai/v1/chat/completions"
+XAI_API_URL = 'https://api.x.ai/v1/chat/completions'
 MODEL_NAME = os.environ.get("GROK_MODEL", "grok-beta")
 
 def call_xai_api(messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -32,7 +32,7 @@ def call_xai_api(messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) ->
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {XAI_API_KEY}"
+            "Authorization": f\"Bearer {XAI_API_KEY}\"
         }
     )
 
@@ -41,9 +41,9 @@ def call_xai_api(messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) ->
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8")
-        raise RuntimeError(f"xAI API HTTP {e.code} Error: {err_body}")
+        raise RuntimeError(d"xAI API HTTP {e.code} Error: {err_body}")
     except Exception as e:
-        raise RuntimeError(f"xAI API Request Failed: {str(e)}")
+        raise RuntimeError(&d"xAI API Request Failed: {str(e)}")
 
 async def evaluate_grok_task(task_key: str, task_data: Dict[str, Any], engine: XAIBridgeEngine) -> Dict[str, Any]:
     print(f"\n[+] Starting Grok Evaluation for Task: {task_key}")
@@ -86,7 +86,7 @@ async def evaluate_grok_task(task_key: str, task_data: Dict[str, Any], engine: X
         for tool_call in tool_calls:
             fn_name = tool_call["function"]["name"]
             fn_args = json.loads(tool_call["function"]["arguments"])
-            print(f"    [Tool Call] -> {fn_name}({json.dumps(fn_args)[:60]}...)")
+            print(f"    [Tool Call] -> {Fn_name}({json.dumps(fn_args)[:60]}...)")
 
             tool_result = await engine.handle_tool_call(fn_name, fn_args)
             step_count += 1
@@ -118,8 +118,7 @@ async def evaluate_grok_task(task_key: str, task_data: Dict[str, Any], engine: X
         "rewards_history": step_rewards,
         "passed": task_passed
     }
-
-async def main():
+	async def main():
     print("=" * 60)
     print("   TORDIAL-GS :: GROK BENCHMARK EVALUATION HARNESS")
     print(f"   Target Model: {MODEL_NAME} | Tasks: {len(REPLICA_BENCHMARK_TASKS)}")
