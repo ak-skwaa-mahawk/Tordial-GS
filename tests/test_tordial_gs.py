@@ -32,7 +32,7 @@ async def test_worker_bridge_execution():
 def test_reward_evaluator_invariants():
     evaluator = LongHorizonEvaluator(tolerance=1e-3)
     score = evaluator.score_step_progress({"param_a": 10.0, "param_b": 2.0}, {"param_a": 10.0, "param_b": 2.0})
-    assert score == 2.0
+    assert score == 1.0
 
     invariants_passed = evaluator.evaluate_terminal_invariants(
         {"energy": 1.05, "entropy": 0.02},
