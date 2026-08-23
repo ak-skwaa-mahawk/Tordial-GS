@@ -3,7 +3,7 @@ import os, sys, json, asyncio, urllib.request, urllib.error
 from typing import Dict, Any, List
 from core.bridge.xai_client import XAIBridgeEngine, TOOL_SCHEMAS
 from core.rewards.evaluator import LongHorizonEvaluator
-from tests.fixtures.replica_tasks import REPLICA_BENCHMARK_TASKS
+from tests.fixtures.replica_benchmark import REPLICA_BENCHMARK_TASKS
 
 XAI_API_KEY = os.environ.get('XAI_API_KEY', '').strip()
 XAI_API_URL = 'https://api.x.ai/v1/chat/completions'
