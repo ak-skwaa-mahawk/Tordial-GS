@@ -76,13 +76,15 @@ class XAIBridgeEngine:
             hypothesis = arguments.get("hypothesis", "")
             parameters = arguments.get("parameters", {})
             dependencies = arguments.get("dependencies", [])
-            director.add_step(node_id=node_id, hypothesis=hypothesis, parameters=parameters, dependencies=dependencies)
+            node = director.add_step(node_id=node_id, hypothesis=hypothesis, parameters=parameters, dependencies=dependencies)
             node = director.nodes[node_id]
             executable_node_ids = [n.node_id for n in director.get_executable_nodes()]
             return {
                 "status": "NODE_REGISTERED",
                 "plan_id": plan_id,
-                "node_id": node.node_id,
+                "node_id": arguments["node_id"],
+                "hypothesis": arguments["hypothesis"],
+                "dependencies": arguments.get("dependencies", []),
                 "hypothesis": node.hypothesis,
                 "dependencies": node.dependencies,
                 "executable_now": node.node_id in executable_node_ids
