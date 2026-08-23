@@ -62,3 +62,23 @@ def test_scientific_director_failure_recovery():
     ready = director.get_executable_nodes()
     assert len(ready) == 1
     assert ready[0].node_id == "H1"
+
+def test_long_horizon_trajectory_decay():
+    evaluator = LongHorizonEvaluator(tolerance=1e-3, step_penalty=0.1)
+    # Immediate high progress on step 1
+    score_s1 = evaluator.score_step_progress({"energy": 10.0}, {"energy": 10.0}, step_count=1)
+    # Same progress on delayed step 4 receives step decay penalty
+    score_s4 = evaluator.score_step_progress({"energy": 10.0}, {"energy": 10.0}, step_count=4)
+    
+    assert score_s1 == 1.0
+    assert score_s4 == 0.7
+
+def test_trajectory_efficiency_score():
+    evaluator = LongHorizonEvaluator()
+    improving_trajectory = [0.2, 0.4, 0.7, 0.95]
+    stagnant_trajectory = [0.5, 0.5, 0.5, 0.5]
+    
+    score_improving = evaluator.calculate_trajectory_efficiency(improving_trajectory)
+    score_stagnant = evaluator.calculate_trajectory_efficiency(stagnant_trajectory)
+    
+    assert score_improving > score_stagnant
