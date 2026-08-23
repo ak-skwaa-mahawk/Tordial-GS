@@ -94,3 +94,37 @@ async def test_worker_bridge_context_compression():
     assert res["status"] == "FAILED"
     assert "Invariant broken" in res["compressed_context"]
     assert len(res["compressed_context"]) < 120
+
+def test_branch_pruning_on_terminal_failure():
+    director = ScientificDirector(plan_id="EXP-PRUNE", max_retries=0)
+    director.add_step("A", "Root step", {})
+    director.add_step("B", "Child of A", {}, dependencies=["A"])
+    director.add_step("C", "Child of B", {}, dependencies=["B"])
+
+    director.record_outcome("A", "FAILED", error="Hardware fault")
+    
+    assert director.nodes["A"].status == "FAILED"
+    assert director.nodes["B"].status == "PRUNED"
+    assert director.nodes["C"].status == "PRUNED"
+
+def test_efficiency_based_stalled_branch_pruning():
+    director = ScientificDirector(plan_id="EXP-EFF-PRUNE", max_retries=2, min_efficiency_threshold=0.3)
+    director.add_step("A", "Step with retries", {})
+    director.record_outcome("A", "FAILED", error="Timeout")
+    assert director.nodes["A"].status == "PENDING"
+    assert director.nodes["A"].retry_count == 1
+
+    # Prune due to low efficiency
+    pruned = director.prune_stalled_branches_by_efficiency(current_efficiency=0.15)
+    assert "A" in pruned
+    assert director.nodes["A"].status == "PRUNED"
+
+def test_deadlock_detection():
+    director = ScientificDirector(plan_id="EXP-DEADLOCK")
+    # Circular dependency deadlock
+    director.add_step("N1", "Node 1", {}, dependencies=["N2"])
+    director.add_step("N2", "Node 2", {}, dependencies=["N1"])
+
+    status = director.detect_deadlock()
+    assert status["is_deadlocked"] is True
+    assert status["has_cycles"] is True
