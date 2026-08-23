@@ -80,7 +80,7 @@ async def run_experiment_pipeline(
             # 2. Worker Bridge dispatch
             result = await bridge.execute_task(
                 task_id=node.node_id,
-                runner_func=simulated_scientific_worker,
+                runner_or_code=simulated_scientific_worker,
                 payload=node.parameters
             )
 
