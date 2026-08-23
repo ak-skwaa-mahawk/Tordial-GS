@@ -131,4 +131,4 @@ class XAIBridgeEngine:
             }
 
         else:
-           return {"status": "ERROR", "message": f\Unknown tool: {tool_name}"}
+            return {"status": "ERROR", "message": f"Unknown tool: {tool_name}"}
