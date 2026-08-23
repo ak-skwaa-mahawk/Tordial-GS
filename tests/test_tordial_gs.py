@@ -39,3 +39,9 @@ def test_reward_evaluator_invariants():
         {"energy": (1.0, 1.1), "entropy": (0.0, 0.05)}
     )
     assert invariants_passed is True
+
+def test_telemetry_emitter_dispatch():
+    from core.bridge.telemetry_emitter import TelemetryEmitter
+    emitter = TelemetryEmitter(host="127.0.0.1", port=9999)
+    # Ensure dispatch does not raise exceptions even without active listeners
+    emitter.emit("invariant_check", {"fidelity": 0.995, "status": "VERIFIED"})
