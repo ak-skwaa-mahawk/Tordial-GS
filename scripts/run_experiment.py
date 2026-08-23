@@ -5,8 +5,12 @@ Reward Evaluator scoring, and Telemetry broadcasting.
 """
 import asyncio
 import argparse
+import os
 import sys
 from typing import Dict, Any
+
+# Ensure project root is in sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from core.director.planner import ScientificDirector
 from core.bridge.worker_pool import WorkerBridge
@@ -20,7 +24,6 @@ async def simulated_scientific_worker(payload: Dict[str, Any]) -> Dict[str, Any]
     noise_factor = payload.get("noise", 0.0)
     step = payload.get("step", 1)
 
-    # Simulate convergence over iterations
     convergence_rate = min(1.0, 0.4 + (step * 0.3))
     simulated_metrics = {}
     for k, v in target_params.items():
@@ -40,7 +43,6 @@ async def run_experiment_pipeline(plan_id: str, ground_truth: Dict[str, float], 
 
     print(f"[*] Initializing Experiment Pipeline: {plan_id}")
     
-    # 1. Scaffold initial DAG hypotheses
     director.add_step("H1_init_bounds", "Calibrate initial phase parameters", {"target_params": ground_truth, "step": 1})
     director.add_step("H2_refine_convergence", "Refine parameter convergence", {"target_params": ground_truth, "step": 2}, dependencies=["H1_init_bounds"])
     director.add_step("H3_verify_invariants", "Final invariant validation", {"target_params": ground_truth, "step": 3}, dependencies=["H2_refine_convergence"])
@@ -57,21 +59,18 @@ async def run_experiment_pipeline(plan_id: str, ground_truth: Dict[str, float], 
             print(f"  [>] Executing Node: {node.node_id} | Hypothesis: {node.hypothesis}")
             node.status = "RUNNING"
 
-            # 2. Worker Bridge dispatch
             result = await bridge.execute_task(
                 task_id=node.node_id,
                 runner_func=simulated_scientific_worker,
                 payload=node.parameters
             )
 
-            # 3. Reward Evaluator step progress scoring
             metrics = result.get("metrics", {})
             step_reward = evaluator.score_step_progress(metrics, ground_truth, step_count=step_index)
             step_rewards.append(step_reward)
 
             print(f"      Status: {result['status']} | Step Reward: {step_reward} | Metrics: {metrics}")
 
-            # 4. Check if invariants hold or verify step
             is_valid = step_reward > 0.6 or (step_index >= 3 and evaluator.evaluate_terminal_invariants(metrics, bounds))
 
             if is_valid:
@@ -79,7 +78,6 @@ async def run_experiment_pipeline(plan_id: str, ground_truth: Dict[str, float], 
             else:
                 director.record_outcome(node.node_id, "FAILED", error="Step reward below threshold")
 
-            # 5. Broadcast to Manifold Telemetry
             telemetry.emit("experiment_step", {
                 "plan_id": plan_id,
                 "node_id": node.node_id,
@@ -90,7 +88,6 @@ async def run_experiment_pipeline(plan_id: str, ground_truth: Dict[str, float], 
 
             step_index += 1
 
-    # Terminal Evaluation
     final_efficiency = evaluator.calculate_trajectory_efficiency(step_rewards)
     all_verified = all(n.status == "VERIFIED" for n in director.nodes.values())
     
