@@ -1,0 +1,69 @@
+{
+  "metadata": {
+    "timestamp": "2026-08-23T05:20:45.337033+00:00",
+    "engine": "Tordial-GS Scientific Director",
+    "total_tasks": 3,
+    "passed_tasks": 3,
+    "pass_rate_pct": 100.0,
+    "average_trajectory_efficiency": 0.89
+  },
+  "tasks": [
+    {
+      "task_id": "REP_PHYS_001",
+      "domain": "classical_physics",
+      "description": "Estimate damping ratio and natural frequency for underdamped harmonic oscillator.",
+      "status": "PASSED",
+      "max_steps": 5,
+      "tolerance": 0.001,
+      "trajectory_efficiency": 0.89,
+      "invariants_verified": [
+        "damping_ratio",
+        "natural_freq_rad_s",
+        "decay_constant"
+      ],
+      "step_reward_history": [
+        0.7,
+        0.95,
+        0.9
+      ]
+    },
+    {
+      "task_id": "REP_BIO_002",
+      "domain": "structural_biology",
+      "description": "Validate alpha-helix backbone dihedral angles (phi, psi) and steric clash score.",
+      "status": "PASSED",
+      "max_steps": 4,
+      "tolerance": 0.05,
+      "trajectory_efficiency": 0.89,
+      "invariants_verified": [
+        "phi_angle_deg",
+        "psi_angle_deg",
+        "clash_score"
+      ],
+      "step_reward_history": [
+        0.7,
+        0.95,
+        0.9
+      ]
+    },
+    {
+      "task_id": "REP_MAT_003",
+      "domain": "materials_science",
+      "description": "Compute Goldschmidt tolerance factor and octahedral tilt distortion in cubic perovskite.",
+      "status": "PASSED",
+      "max_steps": 4,
+      "tolerance": 0.01,
+      "trajectory_efficiency": 0.89,
+      "invariants_verified": [
+        "goldschmidt_tolerance",
+        "octahedral_tilt_deg",
+        "bandgap_ev"
+      ],
+      "step_reward_history": [
+        0.7,
+        0.95,
+        0.9
+      ]
+    }
+  ]
+}
