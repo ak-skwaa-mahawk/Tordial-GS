@@ -82,3 +82,15 @@ def test_trajectory_efficiency_score():
     score_stagnant = evaluator.calculate_trajectory_efficiency(stagnant_trajectory)
     
     assert score_improving > score_stagnant
+
+@pytest.mark.asyncio
+async def test_worker_bridge_context_compression():
+    bridge = WorkerBridge(max_concurrency=1)
+
+    async def failing_runner(payload):
+        raise ValueError("Traceback:\n  File 'eval.py', line 42, in solve\nValueError: Invariant broken")
+
+    res = await bridge.execute_task("TASK-ERR", failing_runner, {})
+    assert res["status"] == "FAILED"
+    assert "Invariant broken" in res["compressed_context"]
+    assert len(res["compressed_context"]) < 120
