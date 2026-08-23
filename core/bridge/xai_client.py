@@ -85,9 +85,9 @@ class XAIBridgeEngine:
                 "node_id": arguments["node_id"],
                 "hypothesis": arguments["hypothesis"],
                 "dependencies": arguments.get("dependencies", []),
-                "hypothesis": node.hypothesis,
-                "dependencies": node.dependencies,
-                "executable_now": node.node_id in executable_node_ids
+                "hypothesis": arguments.get("hypothesis", ""),
+                "dependencies": arguments.get("dependencies", []),
+                "executable_now": arguments["node_id"] in executable_node_ids
             }
         elif tool_name == "sandbox_execute":
             task_id = arguments.get("task_id", "task_0")
