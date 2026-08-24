@@ -16,13 +16,13 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from typing import Dict, Any
 
-from core.mesh.router import SovereignMeshRouter
+from core.mesh.failover_router import DynamicFailoverMeshRouter
 from core.mesh.e8_tba_solver import E8TBASolver
 from core.mesh.e8_visualizer import E8TerminalVisualizer
 from core.mesh.ledger_settlement import SovereignLedgerEngine
 
 # Shared engine singletons
-router = SovereignMeshRouter(node_id="TORDIAL-EDGE-01")
+router = DynamicFailoverMeshRouter(node_id="TORDIAL-EDGE-01")
 tba_solver = E8TBASolver()
 visualizer = E8TerminalVisualizer(solver=tba_solver)
 ledger_engine = SovereignLedgerEngine()
@@ -74,6 +74,7 @@ class SovereignMeshHTTPHandler(BaseHTTPRequestHandler):
             while True:
                 t_eff = 1.2 + 0.2 * np.sin(step * 0.1)
                 tba_data = tba_solver.compute_steady_state_queues(T_eff=t_eff)
+                healthy_peers = router.get_healthy_peers()
                 payload = {
                     "step": step,
                     "node_id": router.node_id,
@@ -82,6 +83,8 @@ class SovereignMeshHTTPHandler(BaseHTTPRequestHandler):
                     "casimir_energy": round(tba_data["ground_state_energy"], 4),
                     "active_roots_count": int(np.count_nonzero(router.queue_depths > 0.05)),
                     "max_queue_depth": float(np.max(router.queue_depths)),
+                    "healthy_peers_count": len(healthy_peers),
+                    "healthy_peers": healthy_peers,
                     "queue_depths": router.queue_depths.tolist()
                 }
                 raw_sock.sendall(build_ws_frame(json.dumps(payload)))
@@ -100,11 +103,14 @@ class SovereignMeshHTTPHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/health":
+            healthy_peers = router.get_healthy_peers()
             payload = {
                 "status": "HEALTHY",
                 "node_id": router.node_id,
                 "active_roots_count": int(np.count_nonzero(router.queue_depths > 0.05)),
-                "max_queue_depth": float(np.max(router.queue_depths))
+                "max_queue_depth": float(np.max(router.queue_depths)),
+                "healthy_peers_count": len(healthy_peers),
+                "healthy_peers": healthy_peers
             }
             self._set_headers(200)
             self.wfile.write(json.dumps(payload).encode("utf-8"))
@@ -114,6 +120,7 @@ class SovereignMeshHTTPHandler(BaseHTTPRequestHandler):
             balances = ledger.get("balances", {})
             tx_count = len(ledger.get("transactions", []))
             tba_data = tba_solver.compute_steady_state_queues(T_eff=1.4)
+            healthy_peers = router.get_healthy_peers()
 
             lines = [
                 "# HELP tordial_e8_active_highways Current number of active E8 root highways with load",
@@ -128,6 +135,9 @@ class SovereignMeshHTTPHandler(BaseHTTPRequestHandler):
                 "# HELP tordial_tba_casimir_energy Vacuum ground state Casimir energy",
                 "# TYPE tordial_tba_casimir_energy gauge",
                 f"tordial_tba_casimir_energy {float(tba_data['ground_state_energy']):.4f}",
+                "# HELP tordial_mesh_healthy_peers Number of active responding peer nodes in the E8 ring",
+                "# TYPE tordial_mesh_healthy_peers gauge",
+                f"tordial_mesh_healthy_peers {len(healthy_peers)}",
                 "# HELP tordial_ledger_transactions_total Total recorded satoshi settlements",
                 "# TYPE tordial_ledger_transactions_total counter",
                 f"tordial_ledger_transactions_total {tx_count}"
@@ -167,7 +177,21 @@ class SovereignMeshHTTPHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
 
-        if path == "/api/v1/e8/dispatch":
+        if path == "/api/v1/peer/heartbeat":
+            content_len = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_len)
+            req = json.loads(body.decode("utf-8")) if body else {}
+            peer_id = req.get("peer_id", "UNKNOWN")
+            router.record_peer_heartbeat(peer_id)
+
+            self._set_headers(200)
+            self.wfile.write(json.dumps({
+                "status": "HEARTBEAT_ACK",
+                "peer_id": peer_id,
+                "healthy_peers": router.get_healthy_peers()
+            }).encode("utf-8"))
+
+        elif path == "/api/v1/e8/dispatch":
             content_len = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_len)
             req = json.loads(body.decode("utf-8")) if body else {}
@@ -183,7 +207,7 @@ class SovereignMeshHTTPHandler(BaseHTTPRequestHandler):
                 phase_drift=float(req.get("phase_drift", 0.002))
             )
             budget_sats = int(req.get("budget_sats", 500))
-            record = router.route_burst(telemetry_8d, budget_sats=budget_sats)
+            record = router.route_burst_with_failover(telemetry_8d, budget_sats=budget_sats)
 
             handoff_entry = {
                 "origin": router.node_id,

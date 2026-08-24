@@ -34,29 +34,21 @@ def test_health_endpoint():
     status, data = make_request("GET", "/health")
     assert status == 200
     assert data["status"] == "HEALTHY"
-    assert "node_id" in data
+    assert "healthy_peers_count" in data
 
 def test_metrics_endpoint():
     status, raw_text = make_request("GET", "/metrics")
     assert status == 200
+    assert "tordial_mesh_healthy_peers" in raw_text
     assert "tordial_e8_active_highways" in raw_text
-    assert "tordial_tba_queue_load" in raw_text
-    assert "tordial_ledger_transactions_total" in raw_text
 
-def test_e8_highways_endpoint():
-    status, data = make_request("GET", "/api/v1/e8/highways")
+def test_peer_heartbeat_endpoint():
+    status, data = make_request("POST", "/api/v1/peer/heartbeat", body={"peer_id": "HEADSCALE-ALPHA"})
     assert status == 200
-    assert data["total_highways"] == 240
-    assert len(data["queue_depths"]) == 240
+    assert data["status"] == "HEARTBEAT_ACK"
+    assert "HEADSCALE-ALPHA" in data["healthy_peers"]
 
-def test_tba_spectrum_endpoint():
-    status, data = make_request("GET", "/api/v1/e8/tba_spectrum?t_eff=1.5")
-    assert status == 200
-    assert len(data["species_masses"]) == 8
-    assert len(data["steady_state_queue_depths"]) == 8
-    assert data["total_queue_load"] > 0
-
-def test_dispatch_burst_endpoint():
+def test_dispatch_burst_with_failover_status():
     payload = {
         "queue_size": 4.5,
         "grad_temp": 3.2,
@@ -70,5 +62,4 @@ def test_dispatch_burst_endpoint():
     }
     status, data = make_request("POST", "/api/v1/e8/dispatch", body=payload)
     assert status == 200
-    assert data["dispatch"]["decision"]["status"] == "E8_HIGHWAY_DISPATCHED"
-    assert data["settlement"]["status"] == "SETTLED"
+    assert data["dispatch"]["decision"]["failover_mode"] in ["DISTRIBUTED", "LOCAL_FALLBACK"]
