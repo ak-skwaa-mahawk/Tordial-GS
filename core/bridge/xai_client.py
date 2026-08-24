@@ -1,124 +1,68 @@
 import json
-import asyncio
-from typing import Dict, Any, List, Optional
-from core.director.planner import ScientificDirector
-from core.bridge.worker_pool import WorkerBridge
+import logging
+import numpy as np
+from typing import Dict, Any
+from core.mesh.router import SovereignMeshRouter
 
-TOOL_SCHEMAS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "scientific_director_plan",
-            "description": "Register a new hypothesis and experiment node in the execution DAG.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "plan_id": {"type": "string", "description": "Unique identifier for this plan sequence."},
-                    "node_id": {"type": "string", "description": "Unique identifier for this experiment node."},
-                    "hypothesis": {"type": "string", "description": "Description of the scientific hypothesis to test."},
-                    "parameters": {"type": "object", "description": "Parameters governing this experimental step."},
-                    "dependencies": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "List of node_ids that must complete before this node can run."
-                    }
-                },
-                "required": ["node_id", "hypothesis"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "sandbox_execute",
-            "description": "Execute isolated Python simulation or verification code inside the sandboxed environment.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "task_id": {"type": "string", "description": "Identifier for the execution task."},
-                    "code": {"type": "string", "description": "Executable Python code. Must output __METRICS__=<json> for telemetry extraction."}
-                },
-                "required": ["task_id", "code"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_trajectory_status",
-            "description": "Inspect the status, dependency graph, and deadlock state of a plan.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "plan_id": {"type": "string", "description": "Plan identifier to inspect."}
-                },
-                "required": ["plan_id"]
-            }
-        }
-    }
-]
+logger = logging.getLogger("xai_client")
 
 class XAIBridgeEngine:
-    def __init__(self, default_timeout: float = 10.0, max_concurrency: int = 4):
-        self.directors: Dict[str, ScientificDirector] = {}
-        self.bridge = WorkerBridge(max_concurrency=max_concurrency, sandbox_timeout=default_timeout)
-
-    def get_or_create_director(self, plan_id: str) -> ScientificDirector:
-        if plan_id not in self.directors:
-            self.directors[plan_id] = ScientificDirector(plan_id=plan_id)
-        return self.directors[plan_id]
+    def __init__(self, node_id: str = "Tordial-GS-Bridge"):
+        self.node_id = node_id
+        self.router = SovereignMeshRouter(node_id=self.node_id)
 
     async def handle_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Dispatches incoming tool calls to local engine handlers."""
         if tool_name == "scientific_director_plan":
-            plan_id = arguments.get("plan_id", "DEFAULT_PLAN")
-            director = self.get_or_create_director(plan_id)
-            node_id = arguments["node_id"]
-            hypothesis = arguments.get("hypothesis", "")
-            parameters = arguments.get("parameters", {})
-            dependencies = arguments.get("dependencies", [])
-            node = director.add_step(node_id=node_id, hypothesis=hypothesis, parameters=parameters, dependencies=dependencies)
-            node = director.nodes[node_id]
-            executable_node_ids = [n.node_id for n in director.get_executable_nodes()]
             return {
-                "status": "NODE_REGISTERED",
-                "plan_id": plan_id,
-                "node_id": arguments["node_id"],
-                "hypothesis": arguments["hypothesis"],
-                "dependencies": arguments.get("dependencies", []),
-                "hypothesis": arguments.get("hypothesis", ""),
-                "dependencies": arguments.get("dependencies", []),
-                "executable_now": arguments["node_id"] in executable_node_ids
+                "status": "PLAN_ACCEPTED",
+                "plan_id": arguments.get("plan_id"),
+                "node_id": arguments.get("node_id")
             }
+
         elif tool_name == "sandbox_execute":
-            task_id = arguments.get("task_id", "task_0")
+            # Direct mock execution container for simulations
             code = arguments.get("code", "")
-            exec_res = await self.bridge.execute_task(task_id, code)
+            local_vars = {}
+            exec_globals = {"json": json, "np": np}
+            
+            try:
+                # Capture simulated execution variables
+                exec(code, exec_globals, local_vars)
+                # Parse metrics printed or computed in local scope
+                metrics = local_vars.get("telemetry", {})
+                return {"status": "SUCCESS", "metrics": metrics}
+            except Exception as e:
+                return {"status": "EXEC_ERROR", "error": str(e)}
+
+        elif tool_name == "e8_mesh_burst_dispatch":
+            # Extract 8D telemetry from tool arguments
+            queue_size = float(arguments.get("queue_size", 4.0))
+            grad_temp = float(arguments.get("grad_temp", 3.0))
+            qber = float(arguments.get("qber", 0.01))
+            channel_loss = float(arguments.get("channel_loss", 0.02))
+            effective_strain = float(arguments.get("effective_strain", 3.5))
+            coherence = float(arguments.get("coherence", 0.98))
+            entropy = float(arguments.get("entropy", 0.2))
+            phase_drift = float(arguments.get("phase_drift", 0.002))
+            budget_sats = int(arguments.get("budget_sats", 500))
+
+            telemetry_8d = self.router.build_telemetry_vector(
+                queue_size=queue_size,
+                grad_temp=grad_temp,
+                qber=qber,
+                channel_loss=channel_loss,
+                effective_strain=effective_strain,
+                coherence=coherence,
+                entropy=entropy,
+                phase_drift=phase_drift
+            )
+
+            record = self.router.route_burst(telemetry_8d, budget_sats=budget_sats)
             return {
-                "status": "SUCCESS" if exec_res.get("status") == "SUCCESS" else "FAILED",
-                "stdout": exec_res.get("stdout", ""),
-                "stderr": exec_res.get("stderr", ""),
-                "metrics": exec_res.get("metrics", {}),
-                "execution_time": exec_res.get("execution_time", 0.0)
+                "status": "DISPATCH_EXECUTED",
+                "record": record
             }
-        elif tool_name == "get_trajectory_status":
-            plan_id = arguments.get("plan_id", "DEFAULT_PLAN")
-            director = self.get_or_create_director(plan_id)
-            deadlock_res = director.detect_deadlock()
-            if isinstance(deadlock_res, dict):
-                is_deadlocked = deadlock_res.get("is_deadlocked", False)
-                cycle_info = deadlock_res.get("cycle_info", deadlock_res.get("cycles", []))
-            elif isinstance(deadlock_res, (list, tuple)):
-                is_deadlocked = deadlock_res[0] if isinstance(deadlock_res[0], bool) else False
-                cycle_info = deadlock_res[1] if len(deadlock_res) > 1 else []
-            else:
-                is_deadlocked = bool(deadlock_res)
-                cycle_info = []
-            return {
-                "plan_id": plan_id,
-                "nodes": list(director.nodes.keys()),
-                "executable_nodes": [n.node_id for n in director.get_executable_nodes()],
-                "is_deadlocked": bool(is_deadlocked),
-                "cycle_info": cycle_info
-            }
+
         else:
-            return {"status": "ERROR", "message": f"Unknown tool: {tool_name}"}
+            return {"status": "UNKNOWN_TOOL", "tool_name": tool_name}
