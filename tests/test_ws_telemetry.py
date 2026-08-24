@@ -2,6 +2,7 @@ import pytest
 import socket
 import json
 import base64
+import struct
 import threading
 import time
 from http.server import HTTPServer
@@ -21,8 +22,9 @@ def run_ws_server():
 
 def test_raw_websocket_handshake_and_frame():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(5.0)
     sock.connect(("127.0.0.1", WS_TEST_PORT))
-    
+
     key = base64.b64encode(b"0123456789abcdef").decode("utf-8")
     req = (
         f"GET /ws/telemetry HTTP/1.1\r\n"
@@ -33,29 +35,44 @@ def test_raw_websocket_handshake_and_frame():
         f"Sec-WebSocket-Version: 13\r\n\r\n"
     )
     sock.sendall(req.encode("utf-8"))
-    
-    # Read HTTP/1.1 101 Switching Protocols response
-    headers = b""
-    while b"\r\n\r\n" not in headers:
-        headers += sock.recv(1024)
-    assert b"101" in headers
-    assert b"Sec-WebSocket-Accept" in headers
 
-    # Read first WebSocket data frame
-    frame_header = sock.recv(2)
-    assert frame_header[0] == 0x81  # Text frame
-    payload_len = frame_header[1] & 0x7F
-    
-    if payload_len == 126:
-        ext_len = sock.recv(2)
-        payload_len = int.from_bytes(ext_len, "big")
-        
-    data = b""
-    while len(data) < payload_len:
-        data += sock.recv(payload_len - len(data))
-        
-    parsed = json.loads(data.decode("utf-8"))
-    assert "species_masses" not in parsed or "queue_depths" in parsed
+    buf = b""
+    while b"\r\n\r\n" not in buf:
+        chunk = sock.recv(1024)
+        if not chunk:
+            break
+        buf += chunk
+
+    assert b"101" in buf
+    assert b"Sec-WebSocket-Accept" in buf
+
+    header_end = buf.find(b"\r\n\r\n") + 4
+    buf = buf[header_end:]
+
+    def read_exact(n):
+        nonlocal buf
+        while len(buf) < n:
+            chunk = sock.recv(1024)
+            if not chunk:
+                raise EOFError("Socket closed")
+            buf += chunk
+        res = buf[:n]
+        buf = buf[n:]
+        return res
+
+    hdr = read_exact(2)
+    assert hdr[0] == 0x81  # FIN + Text Frame opcode
+
+    length = hdr[1] & 0x7F
+    if length == 126:
+        length = struct.unpack("!H", read_exact(2))[0]
+    elif length == 127:
+        length = struct.unpack("!Q", read_exact(8))[0]
+
+    payload = read_exact(length)
+    parsed = json.loads(payload.decode("utf-8"))
+
     assert "node_id" in parsed
     assert "total_queue_load" in parsed
+    assert "queue_depths" in parsed
     sock.close()
