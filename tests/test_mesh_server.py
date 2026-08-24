@@ -25,7 +25,8 @@ def make_request(method: str, path: str, body: dict = None):
     conn.request(method, path, body=body_data, headers=headers)
     res = conn.getresponse()
     raw = res.read().decode("utf-8")
-    data = json.loads(raw) if raw else {}
+    content_type = res.getheader("Content-Type", "")
+    data = json.loads(raw) if "json" in content_type else raw
     conn.close()
     return res.status, data
 
@@ -34,6 +35,13 @@ def test_health_endpoint():
     assert status == 200
     assert data["status"] == "HEALTHY"
     assert "node_id" in data
+
+def test_metrics_endpoint():
+    status, raw_text = make_request("GET", "/metrics")
+    assert status == 200
+    assert "tordial_e8_active_highways" in raw_text
+    assert "tordial_tba_queue_load" in raw_text
+    assert "tordial_ledger_transactions_total" in raw_text
 
 def test_e8_highways_endpoint():
     status, data = make_request("GET", "/api/v1/e8/highways")

@@ -49,6 +49,35 @@ class SovereignMeshHTTPHandler(BaseHTTPRequestHandler):
             self._set_headers(200)
             self.wfile.write(json.dumps(payload).encode("utf-8"))
 
+        elif path == "/metrics":
+            ledger = ledger_engine.load_ledger()
+            balances = ledger.get("balances", {})
+            tx_count = len(ledger.get("transactions", []))
+            tba_data = tba_solver.compute_steady_state_queues(T_eff=1.4)
+
+            lines = [
+                "# HELP tordial_e8_active_highways Current number of active E8 root highways with load",
+                "# TYPE tordial_e8_active_highways gauge",
+                f"tordial_e8_active_highways {int(np.count_nonzero(router.queue_depths > 0.05))}",
+                "# HELP tordial_e8_max_queue_depth Maximum queue depth across all 240 E8 roots",
+                "# TYPE tordial_e8_max_queue_depth gauge",
+                f"tordial_e8_max_queue_depth {float(np.max(router.queue_depths)):.4f}",
+                "# HELP tordial_tba_queue_load Thermodynamic Bethe Ansatz steady-state total queue load",
+                "# TYPE tordial_tba_queue_load gauge",
+                f"tordial_tba_queue_load {float(tba_data['total_queue_load']):.4f}",
+                "# HELP tordial_tba_casimir_energy Vacuum ground state Casimir energy",
+                "# TYPE tordial_tba_casimir_energy gauge",
+                f"tordial_tba_casimir_energy {float(tba_data['ground_state_energy']):.4f}",
+                "# HELP tordial_ledger_transactions_total Total recorded satoshi settlements",
+                "# TYPE tordial_ledger_transactions_total counter",
+                f"tordial_ledger_transactions_total {tx_count}"
+            ]
+            for node, bal in balances.items():
+                lines.append(f'tordial_node_balance_sats{{node="{node}"}} {bal}')
+
+            self._set_headers(200, content_type="text/plain; version=0.0.4")
+            self.wfile.write(("\n".join(lines) + "\n").encode("utf-8"))
+
         elif path == "/api/v1/e8/highways":
             payload = {
                 "total_highways": 240,
