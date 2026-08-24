@@ -1,7 +1,7 @@
 import json
 import time
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Union
 
 LEDGER_PATH = Path("/data/data/com.termux/files/home/GitHub_Workspace/Kimi-K2/ledger.json")
 
@@ -28,8 +28,23 @@ class SovereignLedgerEngine:
                 json.dump(initial_state, f, indent=2)
 
     def load_ledger(self) -> Dict[str, Any]:
-        with open(self.ledger_file, "r") as f:
-            return json.load(f)
+        try:
+            with open(self.ledger_file, "r") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    return {
+                        "version": 1,
+                        "balances": {
+                            "FLOOR_RESERVE": 100000,
+                            "HEADSCALE-ALPHA": 5000,
+                            "HEADSCALE-BETA": 5000,
+                            "HEADSCALE-GAMMA": 5000
+                        },
+                        "transactions": data
+                    }
+                return data
+        except Exception:
+            return {"version": 1, "balances": {}, "transactions": []}
 
     def save_ledger(self, data: Dict[str, Any]):
         with open(self.ledger_file, "w") as f:
@@ -49,7 +64,6 @@ class SovereignLedgerEngine:
         balances = ledger_data.setdefault("balances", {})
         transactions = ledger_data.setdefault("transactions", [])
 
-        # 90% allocated to relayers, 10% to sovereign floor reserve
         relayer_pool = int(budget_sats * 0.90)
         per_hop_reward = relayer_pool // len(dispatched_hops)
         floor_cut = budget_sats - (per_hop_reward * len(dispatched_hops))
