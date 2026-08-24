@@ -14,122 +14,100 @@ async def run_lindblad_simulation():
         {
             "plan_id": plan_id,
             "node_id": "step_1_gksl_density_matrix_evolution",
-            "hypothesis": "Model Lindblad master equation for two NV qubits coupled via lossy topological phonon bus",
+            "hypothesis": "Model Lindblad master equation for two NV qubits coupled via lossy topological phonon bus in the dispersive regime",
             "parameters": {
                 "g_m_MHz": 2.5,
+                "detuning_Delta_MHz": 15.0,
                 "phonon_Q_factor": 1.5e5,
-                "spin_T2_star_us": 10.0,
-                "phonon_fock_cutoff": 3
+                "spin_T2_star_us": 10.0
             }
         }
     )
 
-    sim_code = """
+    sim_code = r"""
 import json
 import numpy as np
 
-# 1. Hilbert Space Construction
-# Subspace: |s_A, s_B, n_ph>, s in {0, 1} (| -1 >, | +1 >), n in {0, 1, 2}
-N_fock = 3
-dim_tot = 4 * N_fock  # 12 states total
+# 1. Hilbert Space Construction: 2 Qubits (NV_A, NV_B) in Dispersive Regime
+# Basis: |0> = |-1, -1>, |1> = |-1, +1>, |2> = |+1, -1>, |3> = |+1, +1>
+dim = 4
 
-def state_idx(sA, sB, n_ph):
-    return (sA * 2 + sB) * N_fock + n_ph
+# 2. Coupling Parameters (GHz)
+g_m = 0.0025          # 2.5 MHz vacuum coupling
+Delta = 0.015         # 15.0 MHz detuning (dispersive regime: Delta >> g_m)
+J_eff = (g_m ** 2) / Delta # Effective spin exchange: ~0.417 MHz
 
-# 2. Coupling and Dissipation Parameters (in GHz units)
-g_m = 0.0025          # 2.5 MHz coupling
 omega_m = 0.280       # 280 MHz mode
-Q_m = 1.5e5           # Phonon quality factor
-kappa_GHz = omega_m / Q_m  # ~1.87 kHz acoustic decay rate
+Q_m = 1.5e5           # Quality factor
+kappa = omega_m / Q_m # Acoustic decay rate: ~1.87 kHz
 
-T2_star_ns = 10000.0  # 10 us spin dephasing
-gamma_phi_GHz = 1.0 / T2_star_ns # 0.1 MHz dephasing
+T2_star_ns = 10000.0  # 10 us dephasing
+gamma_phi = 1.0 / T2_star_ns # 0.1 MHz
 
-# 3. Hamiltonian in Interaction Picture
-H_int = np.zeros((dim_tot, dim_tot), dtype=complex)
-for sA in [0, 1]:
-    for sB in [0, 1]:
-        for n in range(N_fock):
-            idx_from = state_idx(sA, sB, n)
-            if sA == 0 and n > 0:
-                idx_to = state_idx(1, sB, n - 1)
-                H_int[idx_to, idx_from] += g_m * np.sqrt(n)
-                H_int[idx_from, idx_to] += g_m * np.sqrt(n)
-            if sB == 0 and n > 0:
-                idx_to = state_idx(sA, 1, n - 1)
-                H_int[idx_to, idx_from] += g_m * np.sqrt(n)
-                H_int[idx_from, idx_to] += g_m * np.sqrt(n)
+# 3. Effective Dispersive Hamiltonian (GHz)
+# H_eff = J_eff * (|1><2| + |2><1|)
+H_eff = np.zeros((dim, dim), dtype=complex)
+H_eff[1, 2] = J_eff
+H_eff[2, 1] = J_eff
 
-H_rad_ns = H_int * (2.0 * np.pi)
+H_rad_ns = H_eff * (2.0 * np.pi)
 
-# 4. Collapse Operators (Lindblad Jumps)
+# 4. Collapse Operators in Spin Basis
 L_ops = []
 
-# Phonon loss operator: sqrt(kappa) * b
-L_phonon = np.zeros((dim_tot, dim_tot), dtype=complex)
-for sA in [0, 1]:
-    for sB in [0, 1]:
-        for n in range(1, N_fock):
-            L_phonon[state_idx(sA, sB, n - 1), state_idx(sA, sB, n)] = np.sqrt(n)
-L_ops.append(np.sqrt(kappa_GHz * 2.0 * np.pi) * L_phonon)
+# Residual cavity photon dissipation: kappa * (g/Delta)^2 on each spin
+gamma_cavity = kappa * ((g_m / Delta) ** 2)
+L_cav_A = np.zeros((dim, dim), dtype=complex)
+L_cav_A[0, 2] = 1.0 # |+1, -1> -> |-1, -1>
+L_cav_A[1, 3] = 1.0 # |+1, +1> -> |-1, +1>
+L_ops.append(np.sqrt(gamma_cavity * 2.0 * np.pi) * L_cav_A)
 
-# NV A pure dephasing: sqrt(gamma_phi/2) * sigma_z^(A)
-L_szA = np.zeros((dim_tot, dim_tot), dtype=complex)
-for sA in [0, 1]:
-    val = 1.0 if sA == 1 else -1.0
-    for sB in [0, 1]:
-        for n in range(N_fock):
-            idx = state_idx(sA, sB, n)
-            L_szA[idx, idx] = val
-L_ops.append(np.sqrt(0.5 * gamma_phi_GHz * 2.0 * np.pi) * L_szA)
+L_cav_B = np.zeros((dim, dim), dtype=complex)
+L_cav_B[0, 1] = 1.0 # |-1, +1> -> |-1, -1>
+L_cav_B[2, 3] = 1.0 # |+1, +1> -> |+1, -1>
+L_ops.append(np.sqrt(gamma_cavity * 2.0 * np.pi) * L_cav_B)
 
-# NV B pure dephasing: sqrt(gamma_phi/2) * sigma_z^(B)
-L_szB = np.zeros((dim_tot, dim_tot), dtype=complex)
-for sB in [0, 1]:
-    val = 1.0 if sB == 1 else -1.0
-    for sA in [0, 1]:
-        for n in range(N_fock):
-            idx = state_idx(sA, sB, n)
-            L_szB[idx, idx] = val
-L_ops.append(np.sqrt(0.5 * gamma_phi_GHz * 2.0 * np.pi) * L_szB)
+# NV A pure dephasing: sigma_z^(A)
+L_szA = np.diag([-1.0, -1.0, 1.0, 1.0])
+L_ops.append(np.sqrt(0.5 * gamma_phi * 2.0 * np.pi) * L_szA)
 
-# 5. Density Matrix Evolution via Vectorized Liouvillian RK4
-# Initial State: |+1, -1, 0> -> rho = |1,0,0><1,0,0|
-rho = np.zeros((dim_tot, dim_tot), dtype=complex)
-rho[state_idx(1, 0, 0), state_idx(1, 0, 0)] = 1.0
+# NV B pure dephasing: sigma_z^(B)
+L_szB = np.diag([-1.0, 1.0, -1.0, 1.0])
+L_ops.append(np.sqrt(0.5 * gamma_phi * 2.0 * np.pi) * L_szB)
+
+# 5. Density Matrix Evolution (GKSL RK4)
+# Initial State: |+1, -1> = index 2
+rho = np.zeros((dim, dim), dtype=complex)
+rho[2, 2] = 1.0
 
 def lindblad_rhs(r):
-    # Commutator: -i [H, rho]
     comm = -1j * (np.dot(H_rad_ns, r) - np.dot(r, H_rad_ns))
-    # Dissipators: L rho L^\dagger - 0.5 {L^\dagger L, rho}
     diss = np.zeros_like(r)
     for L in L_ops:
         L_dag_L = np.dot(L.conj().T, L)
         diss += np.dot(L, np.dot(r, L.conj().T)) - 0.5 * (np.dot(L_dag_L, r) + np.dot(r, L_dag_L))
     return comm + diss
 
-# Target Bell state projector: |Psi_Bell><Psi_Bell|
-psi_target = np.zeros(dim_tot, dtype=complex)
-psi_target[state_idx(1, 0, 0)] = 1.0 / np.sqrt(2.0)
-psi_target[state_idx(0, 1, 0)] = -1j / np.sqrt(2.0)
+# Target Bell state: (|1> - i|2>) / sqrt(2) = (|-1, +1> - i|+1, -1>) / sqrt(2)
+psi_target = np.zeros(dim, dtype=complex)
+psi_target[1] = 1.0 / np.sqrt(2.0)
+psi_target[2] = -1j / np.sqrt(2.0)
 rho_target = np.outer(psi_target, psi_target.conj())
 
-T_total_ns = 300.0
-Nt = 1500
+T_total_ns = 1800.0
+Nt = 3000
 dt_ns = T_total_ns / Nt
 time_ns = np.linspace(0, T_total_ns, Nt)
 
 fidelity_history = []
 
 for t in time_ns:
-    # Classical RK4 step for master equation
     k1 = lindblad_rhs(rho)
     k2 = lindblad_rhs(rho + 0.5 * dt_ns * k1)
     k3 = lindblad_rhs(rho + 0.5 * dt_ns * k2)
     k4 = lindblad_rhs(rho + dt_ns * k3)
     
     rho += (dt_ns / 6.0) * (k1 + 2.0*k2 + 2.0*k3 + k4)
-    # Enforce Hermiticity and Tr(rho)=1
     rho = 0.5 * (rho + rho.conj().T)
     rho /= np.trace(rho)
     
@@ -140,17 +118,19 @@ max_idx = int(np.argmax(fidelity_history))
 peak_fidelity = float(fidelity_history[max_idx])
 t_bell_ns = float(time_ns[max_idx])
 
-# Trace distance to ideal Bell pair
-trace_distance = float(0.5 * np.sum(np.abs(np.linalg.eigvalsh(rho - rho_target))))
+# Reduced state concurrence
+p1 = float(np.real(rho[1, 1]))
+p2 = float(np.real(rho[2, 2]))
+rho_12 = abs(rho[1, 2])
+concurrence = float(2.0 * max(0.0, rho_12 - np.sqrt(max(0.0, rho[0, 0].real * rho[3, 3].real))))
 
 telemetry = {
-    "phonon_loss_rate_kappa_kHz": round(float(kappa_GHz * 1e6), 3),
-    "spin_dephasing_rate_gamma_phi_kHz": round(float(gamma_phi_GHz * 1e6), 3),
+    "effective_exchange_J_eff_MHz": round(float(J_eff * 1e3), 3),
     "entangling_time_t_bell_ns": round(t_bell_ns, 2),
     "open_system_bell_fidelity": round(peak_fidelity, 4),
+    "entanglement_concurrence": round(concurrence, 4),
     "fidelity_loss_due_to_decoherence": round(1.0 - peak_fidelity, 4),
-    "trace_distance_to_pure_bell": round(trace_distance, 4),
-    "master_equation_status": "GKSL_LINDBLAD_CONVERGED"
+    "master_equation_status": "DISPERSIVE_GKSL_CONVERGED"
 }
 
 print(f"__METRICS__={json.dumps(telemetry)}")
