@@ -26,8 +26,9 @@ def benchmark_e8_dispatcher(iterations: int = 10000, batch_size: int = 256):
     telemetry_samples = rng.normal(loc=[4.0, 3.0, 0.01, 0.02, 3.5, 0.98, 0.2, 0.002], scale=0.05, size=(iterations, 8))
     telemetry_samples[:, 7] = np.clip(telemetry_samples[:, 7], -0.005, 0.005)
 
-    # 1. Warm-up
-    for i in range(500):
+    # 1. Warm-up (clamped to available sample size)
+    warmup_count = min(500, iterations)
+    for i in range(warmup_count):
         dispatcher.compute_dispatch_weights(telemetry_samples[i], queue_depths)
 
     # 2. Sequential Single-Burst Latency Benchmark
@@ -42,7 +43,7 @@ def benchmark_e8_dispatcher(iterations: int = 10000, batch_size: int = 256):
         latencies_us.append((t1 - t0) / 1000.0)
 
     t_end_seq = time.perf_counter()
-    total_time_seq = t_end_seq - t_start_seq
+    total_time_seq = max(t_end_seq - t_start_seq, 1e-9)
     seq_throughput = iterations / total_time_seq
 
     p50 = np.percentile(latencies_us, 50)
@@ -57,28 +58,29 @@ def benchmark_e8_dispatcher(iterations: int = 10000, batch_size: int = 256):
     print(f"    Mean       : {np.mean(latencies_us):.2f} µs")
 
     # 3. Vectorized Matrix Projection Throughput (Batch SIMD)
-    num_batches = iterations // batch_size
-    batch_data = telemetry_samples[:num_batches * batch_size].reshape((num_batches, batch_size, 8))
-    
-    t_start_batch = time.perf_counter()
-    for b in range(num_batches):
-        # Batch inner product: (batch_size, 8) @ (8, 240) -> (batch_size, 240)
-        _ = np.dot(batch_data[b], dispatcher.roots.T)
+    num_batches = max(1, iterations // batch_size)
+    actual_batch_items = num_batches * batch_size
+    if actual_batch_items <= iterations:
+        batch_data = telemetry_samples[:actual_batch_items].reshape((num_batches, batch_size, 8))
+        
+        t_start_batch = time.perf_counter()
+        for b in range(num_batches):
+            _ = np.dot(batch_data[b], dispatcher.roots.T)
 
-    t_end_batch = time.perf_counter()
-    total_time_batch = t_end_batch - t_start_batch
-    batch_throughput = (num_batches * batch_size) / total_time_batch
+        t_end_batch = time.perf_counter()
+        total_time_batch = max(t_end_batch - t_start_batch, 1e-9)
+        batch_throughput = actual_batch_items / total_time_batch
 
-    print(f"\n[2] Vectorized BLAS / NEON Projection:")
-    print(f"    Batch Size : {batch_size}")
-    print(f"    Throughput : {batch_throughput:,.1f} vector projections/sec")
+        print(f"\n[2] Vectorized BLAS / NEON Projection:")
+        print(f"    Batch Size : {batch_size}")
+        print(f"    Throughput : {batch_throughput:,.1f} vector projections/sec")
 
     # 4. End-to-End Router Lifecycle (Gates + Dispatch + History + Decay)
     t_start_e2e = time.perf_counter()
     for i in range(iterations):
         router.route_burst(telemetry_samples[i], budget_sats=500)
     t_end_e2e = time.perf_counter()
-    total_time_e2e = t_end_e2e - t_start_e2e
+    total_time_e2e = max(t_end_e2e - t_start_e2e, 1e-9)
     e2e_throughput = iterations / total_time_e2e
 
     print(f"\n[3] Full Router Lifecycle (3 Safety Gates + Ledger Prep):")
