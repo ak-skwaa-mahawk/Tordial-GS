@@ -5,7 +5,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+import time
 import json
+import base64
+import hashlib
+import struct
+import socket
 import numpy as np
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
@@ -22,6 +27,25 @@ tba_solver = E8TBASolver()
 visualizer = E8TerminalVisualizer(solver=tba_solver)
 ledger_engine = SovereignLedgerEngine()
 
+WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+def build_ws_frame(payload_str: str) -> bytes:
+    payload_bytes = payload_str.encode("utf-8")
+    length = len(payload_bytes)
+    frame = bytearray([0x81])  # FIN bit + text opcode 0x1
+    
+    if length <= 125:
+        frame.append(length)
+    elif length <= 65535:
+        frame.append(126)
+        frame.extend(struct.pack("!H", length))
+    else:
+        frame.append(127)
+        frame.extend(struct.pack("!Q", length))
+        
+    frame.extend(payload_bytes)
+    return bytes(frame)
+
 class SovereignMeshHTTPHandler(BaseHTTPRequestHandler):
     def _set_headers(self, status: int = 200, content_type: str = "application/json"):
         self.send_response(status)
@@ -34,10 +58,46 @@ class SovereignMeshHTTPHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self._set_headers(200)
 
+    def handle_websocket(self):
+        key = self.headers.get("Sec-WebSocket-Key", "").strip()
+        accept_key = base64.b64encode(hashlib.sha1((key + WS_GUID).encode("utf-8")).digest()).decode("utf-8")
+        
+        self.send_response(101)
+        self.send_header("Upgrade", "websocket")
+        self.send_header("Connection", "Upgrade")
+        self.send_header("Sec-WebSocket-Accept", accept_key)
+        self.end_headers()
+
+        raw_sock = self.request
+        step = 0
+        try:
+            while True:
+                t_eff = 1.2 + 0.2 * np.sin(step * 0.1)
+                tba_data = tba_solver.compute_steady_state_queues(T_eff=t_eff)
+                payload = {
+                    "step": step,
+                    "node_id": router.node_id,
+                    "t_eff": round(t_eff, 4),
+                    "total_queue_load": round(tba_data["total_queue_load"], 4),
+                    "casimir_energy": round(tba_data["ground_state_energy"], 4),
+                    "active_roots_count": int(np.count_nonzero(router.queue_depths > 0.05)),
+                    "max_queue_depth": float(np.max(router.queue_depths)),
+                    "queue_depths": router.queue_depths.tolist()
+                }
+                raw_sock.sendall(build_ws_frame(json.dumps(payload)))
+                step += 1
+                time.sleep(0.25)
+        except (BrokenPipeError, ConnectionResetError, socket.error):
+            pass
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
         params = parse_qs(parsed.query)
+
+        if path == "/ws/telemetry" and self.headers.get("Upgrade", "").lower() == "websocket":
+            self.handle_websocket()
+            return
 
         if path == "/health":
             payload = {
