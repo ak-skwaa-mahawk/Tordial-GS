@@ -11,6 +11,7 @@ import base64
 import hashlib
 import struct
 import socket
+import os
 import numpy as np
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
@@ -20,6 +21,7 @@ from core.mesh.failover_router import DynamicFailoverMeshRouter
 from core.mesh.e8_tba_solver import E8TBASolver
 from core.mesh.e8_visualizer import E8TerminalVisualizer
 from core.mesh.ledger_settlement import SovereignLedgerEngine
+from core.mesh.payment_interceptor import verify_xrpl_payment
 
 # Shared engine singletons
 router = DynamicFailoverMeshRouter(node_id="TORDIAL-EDGE-01")
@@ -32,7 +34,7 @@ WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 def build_ws_frame(payload_str: str) -> bytes:
     payload_bytes = payload_str.encode("utf-8")
     length = len(payload_bytes)
-    frame = bytearray([0x81])  # FIN bit + text opcode 0x1
+    frame = bytearray([0x81])
     
     if length <= 125:
         frame.append(length)
@@ -52,7 +54,7 @@ class SovereignMeshHTTPHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Payment-Hash")
         self.end_headers()
 
     def do_OPTIONS(self):
@@ -196,6 +198,29 @@ class SovereignMeshHTTPHandler(BaseHTTPRequestHandler):
             body = self.rfile.read(content_len)
             req = json.loads(body.decode("utf-8")) if body else {}
 
+            budget_sats = int(req.get("budget_sats", 500))
+            require_payment = req.get("require_payment", False)
+            tx_hash = req.get("xrpl_tx_hash") or self.headers.get("X-Payment-Hash")
+
+            # Validate XRPL settlement if payment is explicitly required
+            if require_payment:
+                if not tx_hash:
+                    self._set_headers(402)
+                    self.wfile.write(json.dumps({
+                        "error": "PAYMENT_REQUIRED",
+                        "message": "Missing XRPL transaction hash in 'xrpl_tx_hash' or 'X-Payment-Hash' header",
+                        "required_drops": budget_sats
+                    }).encode("utf-8"))
+                    return
+
+                if not verify_xrpl_payment(tx_hash, required_drops=budget_sats):
+                    self._set_headers(403)
+                    self.wfile.write(json.dumps({
+                        "error": "PAYMENT_VERIFICATION_FAILED",
+                        "message": f"Transaction {tx_hash} is invalid, underpaid, or destination mismatch"
+                    }).encode("utf-8"))
+                    return
+
             telemetry_8d = router.build_telemetry_vector(
                 queue_size=float(req.get("queue_size", 4.0)),
                 grad_temp=float(req.get("grad_temp", 3.0)),
@@ -206,7 +231,6 @@ class SovereignMeshHTTPHandler(BaseHTTPRequestHandler):
                 entropy=float(req.get("entropy", 0.2)),
                 phase_drift=float(req.get("phase_drift", 0.002))
             )
-            budget_sats = int(req.get("budget_sats", 500))
             record = router.route_burst_with_failover(telemetry_8d, budget_sats=budget_sats)
 
             handoff_entry = {
@@ -216,7 +240,11 @@ class SovereignMeshHTTPHandler(BaseHTTPRequestHandler):
             settlement = ledger_engine.settle_burst_dispatch(handoff_entry, budget_sats=budget_sats)
 
             self._set_headers(200)
-            self.wfile.write(json.dumps({"dispatch": record, "settlement": settlement}).encode("utf-8"))
+            self.wfile.write(json.dumps({
+                "dispatch": record,
+                "settlement": settlement,
+                "payment_verified": bool(tx_hash)
+            }).encode("utf-8"))
         else:
             self._set_headers(404)
             self.wfile.write(json.dumps({"error": "NOT_FOUND"}).encode("utf-8"))

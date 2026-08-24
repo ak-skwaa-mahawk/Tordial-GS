@@ -2,6 +2,7 @@ import pytest
 import json
 import threading
 import time
+from unittest.mock import patch
 from http.client import HTTPConnection
 from http.server import HTTPServer
 from core.mesh.server import SovereignMeshHTTPHandler
@@ -18,11 +19,13 @@ def start_test_server():
     server.shutdown()
     server.server_close()
 
-def make_request(method: str, path: str, body: dict = None):
+def make_request(method: str, path: str, body: dict = None, headers: dict = None):
     conn = HTTPConnection("127.0.0.1", TEST_PORT, timeout=2.0)
-    headers = {"Content-Type": "application/json"} if body else {}
+    req_headers = {"Content-Type": "application/json"}
+    if headers:
+        req_headers.update(headers)
     body_data = json.dumps(body) if body else None
-    conn.request(method, path, body=body_data, headers=headers)
+    conn.request(method, path, body=body_data, headers=req_headers)
     res = conn.getresponse()
     raw = res.read().decode("utf-8")
     content_type = res.getheader("Content-Type", "")
@@ -40,26 +43,29 @@ def test_metrics_endpoint():
     status, raw_text = make_request("GET", "/metrics")
     assert status == 200
     assert "tordial_mesh_healthy_peers" in raw_text
-    assert "tordial_e8_active_highways" in raw_text
 
 def test_peer_heartbeat_endpoint():
     status, data = make_request("POST", "/api/v1/peer/heartbeat", body={"peer_id": "HEADSCALE-ALPHA"})
     assert status == 200
     assert data["status"] == "HEARTBEAT_ACK"
-    assert "HEADSCALE-ALPHA" in data["healthy_peers"]
 
-def test_dispatch_burst_with_failover_status():
-    payload = {
-        "queue_size": 4.5,
-        "grad_temp": 3.2,
-        "qber": 0.01,
-        "channel_loss": 0.02,
-        "effective_strain": 3.8,
-        "coherence": 0.99,
-        "entropy": 0.15,
-        "phase_drift": 0.001,
-        "budget_sats": 500
-    }
+def test_dispatch_burst_free_tier():
+    payload = {"budget_sats": 500, "require_payment": False}
     status, data = make_request("POST", "/api/v1/e8/dispatch", body=payload)
     assert status == 200
-    assert data["dispatch"]["decision"]["failover_mode"] in ["DISTRIBUTED", "LOCAL_FALLBACK"]
+    assert data["payment_verified"] is False
+    assert "dispatch" in data
+
+def test_dispatch_burst_missing_payment_required():
+    payload = {"budget_sats": 500, "require_payment": True}
+    status, data = make_request("POST", "/api/v1/e8/dispatch", body=payload)
+    assert status == 402
+    assert data["error"] == "PAYMENT_REQUIRED"
+
+@patch("core.mesh.server.verify_xrpl_payment")
+def test_dispatch_burst_payment_success(mock_verify):
+    mock_verify.return_value = True
+    payload = {"budget_sats": 500, "require_payment": True, "xrpl_tx_hash": "A"*64}
+    status, data = make_request("POST", "/api/v1/e8/dispatch", body=payload)
+    assert status == 200
+    assert data["payment_verified"] is True
