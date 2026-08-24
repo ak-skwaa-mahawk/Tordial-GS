@@ -10,21 +10,25 @@ import logging
 import numpy as np
 from typing import Dict, List, Any
 from core.mesh.router import SovereignMeshRouter
+from core.mesh.ledger_settlement import SovereignLedgerEngine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("headscale_sim")
 
 class VirtualHeadscaleMesh:
-    def __init__(self, node_names: List[str] = None):
+    def __init__(self, node_names: List[str] = None, ledger_engine: SovereignLedgerEngine = None):
         self.node_names = node_names or ["HEADSCALE-ALPHA", "HEADSCALE-BETA", "HEADSCALE-GAMMA"]
         self.nodes: Dict[str, SovereignMeshRouter] = {
             name: SovereignMeshRouter(node_id=name) for name in self.node_names
         }
         self.peer_links = self._establish_mesh_topology()
+        self.ledger = ledger_engine or SovereignLedgerEngine()
         self.global_handoff_log: List[Dict[str, Any]] = []
 
+    def _establish_mesh_topology() -> Dict[str, List[str]]:
+        pass
+    
     def _establish_mesh_topology(self) -> Dict[str, List[str]]:
-        """Fully connects each virtual Headscale node to every other peer in the mesh."""
         links = {}
         for node in self.node_names:
             links[node] = [peer for peer in self.node_names if peer != node]
@@ -37,7 +41,7 @@ class VirtualHeadscaleMesh:
         budget_sats: int = 500,
         ttl: int = 3
     ) -> Dict[str, Any]:
-        """Routes a burst packet hop-by-hop across the virtual mesh using E8 dispatching."""
+        """Routes burst packet and triggers atomic ledger settlement upon handoff completion."""
         current_node = origin_node
         hop_trace = []
 
@@ -59,13 +63,11 @@ class VirtualHeadscaleMesh:
             if status != "E8_HIGHWAY_DISPATCHED":
                 break
 
-            # Pick next hop from peer links via modulo projection of the chosen E8 root index
             peers = self.peer_links[current_node]
             next_node = peers[decision["selected_root_index"] % len(peers)]
             
-            # Attenuation across physical link: preserve energy above 5.5 and clamp phase drift < 0.01
             link_noise = np.random.normal(0, 0.01, size=8)
-            link_noise[7] = np.random.normal(0, 0.001)  # Micro-drift on phase
+            link_noise[7] = np.random.normal(0, 0.001)
             telemetry_8d = (telemetry_8d * 0.98) + link_noise
             telemetry_8d[7] = np.clip(telemetry_8d[7], -0.005, 0.005)
             
@@ -77,11 +79,16 @@ class VirtualHeadscaleMesh:
             "final_status": hop_trace[-1]["status"],
             "trace": hop_trace
         }
+        
+        # Settle satoshi distributions atomically on the sovereign ledger
+        settlement_result = self.ledger.settle_burst_dispatch(handoff_entry, budget_sats=budget_sats)
+        handoff_entry["settlement"] = settlement_result
+        
         self.global_handoff_log.append(handoff_entry)
         return handoff_entry
 
     async def run_traffic_storm(self, burst_count: int = 30) -> Dict[str, Any]:
-        """Simulates distributed concurrent burst dispatches across all virtual nodes."""
+        """Simulates concurrent bursts and aggregates routing + settlement performance."""
         logger.info(f"🌐 Initiating Headscale traffic storm with {burst_count} bursts...")
         tasks = []
         
@@ -93,11 +100,13 @@ class VirtualHeadscaleMesh:
 
         results = await asyncio.gather(*tasks)
         dispatched_hops = sum(r["total_hops"] for r in results if r["final_status"] == "E8_HIGHWAY_DISPATCHED")
-        
+        settled_count = sum(1 for r in results if r.get("settlement", {}).get("status") == "SETTLED")
+
         summary = {
             "nodes_in_mesh": len(self.node_names),
             "bursts_injected": burst_count,
             "successful_handoffs": sum(1 for r in results if r["final_status"] == "E8_HIGHWAY_DISPATCHED"),
+            "total_settled_transactions": settled_count,
             "total_hops_traversed": dispatched_hops,
             "per_node_queue_depths": {
                 name: float(np.max(router.queue_depths)) for name, router in self.nodes.items()
