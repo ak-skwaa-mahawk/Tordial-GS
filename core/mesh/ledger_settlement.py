@@ -1,96 +1,104 @@
 import json
+import os
+import tempfile
 import time
-from pathlib import Path
-from typing import Dict, Any, List, Union
+from typing import Dict, Any, List
 
-LEDGER_PATH = Path("/data/data/com.termux/files/home/GitHub_Workspace/Kimi-K2/ledger.json")
+LEDGER_PATH = "/data/data/com.termux/files/home/GitHub_Workspace/Kimi-K2/ledger.json"
+
+DEFAULT_LEDGER = {
+    "version": "1.0.0",
+    "updated_at": 0,
+    "total_gross_volume_sats": 0,
+    "balances": {
+        "FLOOR_RESERVE": 207300,
+        "HEADSCALE-ALPHA": 5000,
+        "HEADSCALE-BETA": 5000,
+        "HEADSCALE-GAMMA": 5000,
+        "ALPHA": 13650,
+        "GAMMA": 11700,
+        "BETA": 7050,
+        "TORDIAL-EDGE-01": 933300
+    },
+    "transactions": []
+}
 
 class SovereignLedgerEngine:
-    def __init__(self, ledger_file: Path = LEDGER_PATH):
+    def __init__(self, ledger_file: str = LEDGER_PATH):
         self.ledger_file = ledger_file
-        self._ensure_ledger_exists()
+        self.ensure_ledger_exists()
 
-    def _ensure_ledger_exists(self):
-        if not self.ledger_file.parent.exists():
-            self.ledger_file.parent.mkdir(parents=True, exist_ok=True)
-        if not self.ledger_file.exists():
-            initial_state = {
-                "version": 1,
-                "balances": {
-                    "FLOOR_RESERVE": 100000,
-                    "HEADSCALE-ALPHA": 5000,
-                    "HEADSCALE-BETA": 5000,
-                    "HEADSCALE-GAMMA": 5000
-                },
-                "transactions": []
-            }
-            with open(self.ledger_file, "w") as f:
-                json.dump(initial_state, f, indent=2)
+    def ensure_ledger_exists(self):
+        if not os.path.exists(self.ledger_file):
+            os.makedirs(os.path.dirname(self.ledger_file), exist_ok=True)
+            self._atomic_save(DEFAULT_LEDGER)
 
-    def load_ledger(self) -> Dict[str, Any]:
+    def _atomic_save(self, data: dict):
+        dir_name = os.path.dirname(self.ledger_file)
+        os.makedirs(dir_name, exist_ok=True)
+        with tempfile.NamedTemporaryFile("w", dir=dir_name, delete=False) as tf:
+            json.dump(data, tf, indent=2)
+            temp_name = tf.name
+        os.replace(temp_name, self.ledger_file)
+
+    def load_ledger(self) -> dict:
         try:
             with open(self.ledger_file, "r") as f:
-                data = json.load(f)
-                if isinstance(data, list):
-                    return {
-                        "version": 1,
-                        "balances": {
-                            "FLOOR_RESERVE": 100000,
-                            "HEADSCALE-ALPHA": 5000,
-                            "HEADSCALE-BETA": 5000,
-                            "HEADSCALE-GAMMA": 5000
-                        },
-                        "transactions": data
-                    }
-                return data
+                return json.load(f)
         except Exception:
-            return {"version": 1, "balances": {}, "transactions": []}
+            return DEFAULT_LEDGER.copy()
 
-    def save_ledger(self, data: Dict[str, Any]):
-        with open(self.ledger_file, "w") as f:
-            json.dump(data, f, indent=2)
-
-    def settle_burst_dispatch(self, handoff_entry: Dict[str, Any], budget_sats: int = 500) -> Dict[str, Any]:
-        """
-        Distributes satoshi rewards to intermediate forwarding nodes along the E8 highway.
-        """
-        trace = handoff_entry.get("trace", [])
-        dispatched_hops = [h["node_id"] for h in trace if h.get("status") == "E8_HIGHWAY_DISPATCHED"]
+    def settle_burst_dispatch(self, handoff_entry: dict, budget_sats: int = 500) -> dict:
+        ledger = self.load_ledger()
+        balances = ledger.setdefault("balances", {})
         
-        if not dispatched_hops:
-            return {"status": "NO_REWARDS_ZERO_DISPATCH", "distributed_sats": 0}
+        origin = handoff_entry.get("origin", "TORDIAL-EDGE-01")
+        trace = handoff_entry.get("trace", [])
+        
+        # Identify nodes that successfully dispatched an E8 highway hop
+        dispatched_nodes = [
+            hop.get("node_id") for hop in trace 
+            if hop.get("status") == "E8_HIGHWAY_DISPATCHED" and hop.get("node_id")
+        ]
 
-        ledger_data = self.load_ledger()
-        balances = ledger_data.setdefault("balances", {})
-        transactions = ledger_data.setdefault("transactions", [])
+        if not dispatched_nodes:
+            return {
+                "tx_id": None,
+                "status": "NO_REWARDS_ZERO_DISPATCH",
+                "origin": origin,
+                "hops": [],
+                "allocations": {},
+                "total_budget": budget_sats
+            }
 
-        relayer_pool = int(budget_sats * 0.90)
-        per_hop_reward = relayer_pool // len(dispatched_hops)
-        floor_cut = budget_sats - (per_hop_reward * len(dispatched_hops))
+        floor_cut = int(budget_sats * 0.10)
+        net_budget = budget_sats - floor_cut
+        per_node_cut = int(net_budget / len(dispatched_nodes))
 
-        tx_id = f"tx_e8_{int(time.time() * 1000)}"
-        tx_allocations = {}
-
-        for node_id in dispatched_hops:
-            balances[node_id] = balances.get(node_id, 0) + per_hop_reward
-            tx_allocations[node_id] = per_hop_reward
-
+        allocations = {"FLOOR_RESERVE": floor_cut}
         balances["FLOOR_RESERVE"] = balances.get("FLOOR_RESERVE", 0) + floor_cut
-        tx_allocations["FLOOR_RESERVE"] = floor_cut
+
+        for node in dispatched_nodes:
+            allocations[node] = allocations.get(node, 0) + per_node_cut
+            balances[node] = balances.get(node, 0) + per_node_cut
+
+        ledger["total_gross_volume_sats"] = ledger.get("total_gross_volume_sats", 0) + budget_sats
+        ledger["updated_at"] = time.time()
 
         tx_record = {
-            "tx_id": tx_id,
+            "tx_id": f"tx_e8_{int(time.time()*1000)}_{origin}",
             "timestamp": time.time(),
-            "origin": handoff_entry.get("origin"),
-            "hops": dispatched_hops,
+            "origin": origin,
+            "hops": dispatched_nodes,
             "total_budget": budget_sats,
-            "allocations": tx_allocations
+            "allocations": allocations,
+            "status": "SETTLED"
         }
-        transactions.append(tx_record)
-        self.save_ledger(ledger_data)
 
-        return {
-            "status": "SETTLED",
-            "tx_id": tx_id,
-            "allocations": tx_allocations
-        }
+        tx_list = ledger.setdefault("transactions", [])
+        tx_list.append(tx_record)
+        if len(tx_list) > 2500:
+            ledger["transactions"] = tx_list[-2500:]
+
+        self._atomic_save(ledger)
+        return tx_record
