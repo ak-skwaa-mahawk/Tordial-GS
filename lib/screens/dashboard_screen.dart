@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../widgets/e8_highway_matrix.dart';
+import '../widgets/burst_dispatch_form.dart';
 
 class DashboardScreen extends StatefulWidget {
   final String serverUrl;
@@ -77,7 +78,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Top Metrics Row
             Row(
               children: [
                 Expanded(
@@ -98,9 +98,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
             const SizedBox(height: 16),
-
-            // Live 240-Root Matrix Visualizer
             E8HighwayMatrixView(serverUrl: widget.serverUrl),
+            const SizedBox(height: 16),
+            BurstDispatchForm(
+              serverUrl: widget.serverUrl,
+              onDispatched: _fetchData,
+            ),
           ],
         ),
       ),
