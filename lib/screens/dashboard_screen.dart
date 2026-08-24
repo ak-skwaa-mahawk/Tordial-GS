@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../widgets/e8_highway_matrix.dart';
 import '../widgets/burst_dispatch_form.dart';
+import '../widgets/peer_health_matrix.dart';
 
 class DashboardScreen extends StatefulWidget {
   final String wsUrl;
@@ -71,7 +72,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final nodeId = _liveData['node_id'] ?? 'CONNECTING...';
     final totalLoad = (_liveData['total_queue_load'] as num?)?.toStringAsFixed(3) ?? '0.000';
     final casimir = (_liveData['casimir_energy'] as num?)?.toStringAsFixed(4) ?? '0.0000';
-    final activeRoots = _liveData['active_roots_count'] ?? 0;
+    final healthyPeers = _liveData['healthy_peers'] as List<dynamic>? ?? [];
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E14),
@@ -121,6 +122,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            PeerHealthMatrixView(healthyPeers: healthyPeers),
             const SizedBox(height: 16),
             E8HighwayMatrixView(serverUrl: widget.serverUrl),
             const SizedBox(height: 16),
