@@ -1,5 +1,6 @@
 import subprocess
 import socket
+import urllib.request
 import concurrent.futures
 
 def get_local_subnet():
@@ -26,6 +27,14 @@ def probe_node(ip, port=8022, timeout=0.2):
         s.close()
     return None
 
+def notify_webhook(peer_ip):
+    url = f"http://{peer_ip}:8089/sync"
+    try:
+        req = urllib.request.Request(url, data=b"", method="POST")
+        urllib.request.urlopen(req, timeout=1.5)
+    except Exception:
+        pass
+
 def push_to_peer(peer_ip):
     remote_url = f"ssh://{peer_ip}:8022/data/data/com.termux/files/home/Tordial-GS"
     cmd = [
@@ -41,11 +50,10 @@ def push_to_peer(peer_ip):
             timeout=5
         )
         if res.returncode == 0:
-            print(f"[+] [P2P SYNC] Successfully synced to peer {peer_ip}")
+            print(f"[+] [P2P SYNC] Successfully pushed to peer {peer_ip}")
+            notify_webhook(peer_ip)
         else:
-            print(f"[-] [P2P SYNC] Peer {peer_ip} rejected push: {res.stderr.strip()}")
-    except subprocess.TimeoutExpired:
-        print(f"[!] [P2P SYNC] Timeout pushing to peer {peer_ip}")
+            print(f"[-] [P2P SYNC] Push skipped/rejected on {peer_ip}")
     except Exception as e:
         print(f"[!] [P2P SYNC] Error syncing with {peer_ip}: {e}")
 
