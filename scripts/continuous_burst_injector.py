@@ -15,13 +15,17 @@ from core.mesh.feedback_manifold_bridge import FeedbackManifoldBridge
 ENDPOINT = "http://127.0.0.1:8080/api/v1/e8/dispatch"
 
 def generate_burst_payload(bridge=None, origin: str = "TORDIAL-EDGE-01", budget_sats: int = 500, require_payment: bool = False) -> dict:
-    """Generates an 8D coherent burst dispatch payload."""
+    """Generates an 8D coherent burst dispatch payload compliant with mesh test schema."""
     if bridge is None:
         bridge = FeedbackManifoldBridge(num_nodes=8)
     vec = bridge.generate_coherent_telemetry(dt=0.03)
+    
     return {
         "origin": origin,
         "telemetry": vec.tolist(),
+        "queue_size": int(vec[1]),
+        "latency_ms": float(vec[0]),
+        "packet_loss": float(vec[2]),
         "budget_sats": budget_sats,
         "require_payment": require_payment
     }
