@@ -2,7 +2,6 @@
 import sys
 from pathlib import Path
 
-# Add project root to sys.path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
@@ -15,6 +14,18 @@ from core.mesh.feedback_manifold_bridge import FeedbackManifoldBridge
 
 ENDPOINT = "http://127.0.0.1:8080/api/v1/e8/dispatch"
 
+def generate_burst_payload(bridge=None, origin: str = "TORDIAL-EDGE-01", budget_sats: int = 500, require_payment: bool = False) -> dict:
+    """Generates an 8D coherent burst dispatch payload."""
+    if bridge is None:
+        bridge = FeedbackManifoldBridge(num_nodes=8)
+    vec = bridge.generate_coherent_telemetry(dt=0.03)
+    return {
+        "origin": origin,
+        "telemetry": vec.tolist(),
+        "budget_sats": budget_sats,
+        "require_payment": require_payment
+    }
+
 def start_continuous_feed():
     print("=" * 60)
     print("🚀 CONTINUOUS HARMONIC BURST INJECTOR ACTIVATED")
@@ -24,13 +35,8 @@ def start_continuous_feed():
     
     while True:
         try:
-            vec = bridge.generate_coherent_telemetry(dt=0.03)
-            payload = {
-                "origin": "TORDIAL-EDGE-01",
-                "telemetry": vec.tolist(),
-                "budget_sats": 500,
-                "require_payment": False
-            }
+            payload = generate_burst_payload(bridge=bridge)
+            coherence = payload["telemetry"][5]
             
             req_data = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(
@@ -41,7 +47,6 @@ def start_continuous_feed():
             
             with urllib.request.urlopen(req, timeout=5) as resp:
                 result = json.loads(resp.read().decode("utf-8"))
-                coherence = vec[5]
                 print(f"[*] Dispatched Burst | Coherence={coherence:.4f} | Status={result.get('status', 'OK')}")
                 
         except urllib.error.URLError as e:
