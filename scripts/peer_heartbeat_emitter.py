@@ -2,14 +2,7 @@ import time
 import urllib.request
 import json
 
-PEERS = [
-    "HEADSCALE-ALPHA",
-    "HEADSCALE-BETA",
-    "HEADSCALE-GAMMA",
-    "ALPHA",
-    "BETA",
-    "GAMMA"
-]
+PEERS = ["TORDIAL-EDGE-02"]
 TARGET_URL = "http://127.0.0.1:8080/api/v1/peer/heartbeat"
 
 def emit_heartbeats():
