@@ -103,7 +103,7 @@ def run_http_server():
     print(f"[*] [PEER LISTENER] Webhook listener running on port {PORT}...")
     server.serve_forever()
 
-def run_periodic_polling(interval_seconds=60):
+def run_periodic_polling(interval_seconds=10):
     print(f"[*] [PEER LISTENER] Periodic fallback polling active (every {interval_seconds}s)...")
     while True:
         time.sleep(interval_seconds)
@@ -112,4 +112,4 @@ def run_periodic_polling(interval_seconds=60):
 if __name__ == "__main__":
     http_thread = threading.Thread(target=run_http_server, daemon=True)
     http_thread.start()
-    run_periodic_polling(interval_seconds=60)
+    run_periodic_polling(interval_seconds=10)

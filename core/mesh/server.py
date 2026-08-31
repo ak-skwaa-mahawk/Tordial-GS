@@ -233,9 +233,14 @@ class SovereignMeshHTTPHandler(BaseHTTPRequestHandler):
             )
             record = router.route_burst_with_failover(telemetry_8d, budget_sats=budget_sats)
 
+            hops = [{"node_id": router.node_id, "status": record["decision"]["status"]}]
+            if record["decision"].get("failover_mode") == "DISTRIBUTED":
+                for peer in router.get_healthy_peers():
+                    if peer != router.node_id:
+                        hops.append({"node_id": peer, "status": "E8_HIGHWAY_DISPATCHED"})
             handoff_entry = {
                 "origin": router.node_id,
-                "trace": [{"node_id": router.node_id, "status": record["decision"]["status"]}]
+                "trace": hops
             }
             settlement = ledger_engine.settle_burst_dispatch(handoff_entry, budget_sats=budget_sats)
 
@@ -252,3 +257,7 @@ class SovereignMeshHTTPHandler(BaseHTTPRequestHandler):
 def run_server(host: str = "0.0.0.0", port: int = 8080):
     server = HTTPServer((host, port), SovereignMeshHTTPHandler)
     server.serve_forever()
+
+if __name__ == "__main__":
+    print("[*] Launching SovereignMeshHTTPHandler on 0.0.0.0:8080...")
+    run_server()
