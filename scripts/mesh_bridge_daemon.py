@@ -124,7 +124,16 @@ async def uplink_sender_loop():
 
     while True:
         try:
-            async with websockets.connect(UPLINK_WSS_URL, extra_headers=headers, ssl=ssl_ctx) as ws:
+            try:
+                connect_kwargs = {"ssl": ssl_ctx}
+                if headers:
+                    import inspect
+                    sig = inspect.signature(websockets.connect)
+                    if "additional_headers" in sig.parameters:
+                        connect_kwargs["additional_headers"] = headers
+                    else:
+                        connect_kwargs["extra_headers"] = headers
+                async with websockets.connect(UPLINK_WSS_URL, **connect_kwargs) as ws:
                 while True:
                     msg = await outbound_queue.get()
                     await ws.send(msg)
