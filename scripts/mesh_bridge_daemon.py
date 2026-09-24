@@ -6,13 +6,14 @@ import struct
 import logging
 import os
 import ssl
+import inspect
 import websockets
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-WS_HOST = "127.0.0.1"
-WS_PORT = 8765
-UDP_PORT = 9999
+WS_HOST = os.getenv("MESH_WS_HOST", "127.0.0.1")
+WS_PORT = int(os.getenv("MESH_WS_PORT", "8765"))
+UDP_PORT = int(os.getenv("MESH_UDP_PORT", "9999"))
 
 SOVA_MAGIC = 0x534F5641
 SOVR_FLAG_STATUTORY_DUTY      = (1 << 0)
@@ -119,32 +120,34 @@ async def udp_listener_loop():
 async def uplink_sender_loop():
     if not UPLINK_WSS_URL:
         return
+
     if UPLINK_VERIFY_TLS:
         ssl_ctx = ssl.create_default_context()
     else:
         ssl_ctx = ssl.create_default_context()
         ssl_ctx.check_hostname = False
         ssl_ctx.verify_mode = ssl.CERT_NONE
+
     headers = {"Authorization": f"Bearer {UPLINK_TOKEN}"} if UPLINK_TOKEN else {}
+
+    connect_kwargs = {"ssl": ssl_ctx}
+    if headers:
+        sig = inspect.signature(websockets.connect)
+        if "additional_headers" in sig.parameters:
+            connect_kwargs["additional_headers"] = headers
+        else:
+            connect_kwargs["extra_headers"] = headers
 
     while True:
         try:
-            try:
-                connect_kwargs = {"ssl": ssl_ctx}
-                if headers:
-                    import inspect
-                    sig = inspect.signature(websockets.connect)
-                    if "additional_headers" in sig.parameters:
-                        connect_kwargs["additional_headers"] = headers
-                    else:
-                        connect_kwargs["extra_headers"] = headers
-                async with websockets.connect(UPLINK_WSS_URL, **connect_kwargs) as ws:
+            async with websockets.connect(UPLINK_WSS_URL, **connect_kwargs) as ws:
+                logging.info("Established uplink connection.")
                 while True:
                     msg = await outbound_queue.get()
                     await ws.send(msg)
                     outbound_queue.task_done()
         except Exception as e:
-            logging.error(f"🌐 [UPLINK CONNECTION ERROR]: {e}")
+            logging.error(f"Uplink connection error: {e}")
             await asyncio.sleep(1)
 
 async def main():
