@@ -119,7 +119,12 @@ async def udp_listener_loop():
 async def uplink_sender_loop():
     if not UPLINK_WSS_URL:
         return
-    ssl_ctx = ssl.create_default_context() if UPLINK_VERIFY_TLS else ssl._create_unverified_context()
+    if UPLINK_VERIFY_TLS:
+        ssl_ctx = ssl.create_default_context()
+    else:
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
     headers = {"Authorization": f"Bearer {UPLINK_TOKEN}"} if UPLINK_TOKEN else {}
 
     while True:
@@ -138,8 +143,9 @@ async def uplink_sender_loop():
                     msg = await outbound_queue.get()
                     await ws.send(msg)
                     outbound_queue.task_done()
-        except Exception:
-            await asyncio.sleep(5)
+        except Exception as e:
+            logging.error(f"🌐 [UPLINK CONNECTION ERROR]: {e}")
+            await asyncio.sleep(1)
 
 async def main():
     async with websockets.serve(ws_handler, WS_HOST, WS_PORT):
