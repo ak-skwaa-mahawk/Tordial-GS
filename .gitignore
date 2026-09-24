@@ -9,3 +9,4 @@ __pycache__/
 reports/*.json
 reports/*.md
 grok_eval_run.log
+releases/
