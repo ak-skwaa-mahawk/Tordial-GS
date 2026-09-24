@@ -119,9 +119,15 @@ def package():
         ])
     
     check_dir = os.path.join(RELEASES_DIR, release_tag)
+    pubkey_path = os.path.join(check_dir, "pubkey.pem")
+    subprocess.run([
+        "openssl", "x509", "-pubkey", "-noout",
+        "-in", os.path.join(check_dir, "release_attestation.crt")
+    ], stdout=open(pubkey_path, "w"), check=True)
+
     verify_res = subprocess.run([
         "openssl", "dgst", "-sha256",
-        "-verify", os.path.join(check_dir, "release_attestation.crt"),
+        "-verify", pubkey_path,
         "-signature", os.path.join(check_dir, "MANIFEST.sha256.sig"),
         os.path.join(check_dir, "MANIFEST.sha256")
     ], capture_output=True, text=True)
