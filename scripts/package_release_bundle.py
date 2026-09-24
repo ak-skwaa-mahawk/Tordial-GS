@@ -47,6 +47,12 @@ def package():
     staging_dir = os.path.join(RELEASES_DIR, release_tag)
     os.makedirs(staging_dir, exist_ok=True)
 
+    print("[*] Pre-flight Check: Verifying cryptographic journal integrity...")
+    if not audit_journal(JOURNAL_PATH):
+        print("[-] RELEASE ABORTED: Audit journal failed cryptographic integrity verification.")
+        sys.exit(1)
+    print("[+] Pre-flight Check: Journal cryptographic integrity verified.")
+
     print(f"[*] Staging artifacts for release: {release_tag}")
 
     manifest_lines = []
