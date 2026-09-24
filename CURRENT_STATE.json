@@ -1,11 +1,11 @@
 {
-  "seq_id": 21,
-  "timestamp": 1790287398.0438879,
-  "prev_entry_hash": "e2ab8cf08f0088441de8124f9a2a704c67688d840afa0f625ed54c587c328058",
+  "seq_id": 22,
+  "timestamp": 1790287515.3386323,
+  "prev_entry_hash": "eeb1ef81ceefe53e7dfbe2fc834c83b9d9251da0909feeebd05d200ca6f31d96",
   "magic": "0x534f5641",
   "status_code": "0x0",
   "flags": {
-    "raw": 1,
+    "raw": 9,
     "statutory_duty": true,
     "corporate_defense_valid": false,
     "can_be_administered_away": false
