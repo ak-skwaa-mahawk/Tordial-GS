@@ -14,6 +14,12 @@ import sys
 import tarfile
 import time
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
+
+from verify_journal_integrity import audit_journal
+
 BASE_DIR = os.path.expanduser("~/Tordial-GS")
 JOURNAL_PATH = os.path.expanduser("~/.sovereign_audit_journal.jsonl")
 RELEASES_DIR = os.path.join(BASE_DIR, "releases")
