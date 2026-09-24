@@ -17,5 +17,10 @@
   "threat_model_seq27": {
     "anti_replay_test": "VERIFIED_PASSED",
     "monotonic_sequence_enforced": true
+  },
+  "q16_saturation_load_bench": {
+    "status": "VERIFIED_COMPLETED",
+    "timestamp": 1790292604.183844,
+    "invariant_check": "ZERO_DROPPED_FRAMES_816B_LAYOUT"
   }
 }

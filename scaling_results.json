@@ -1,58 +1,50 @@
-[
-  {
-    "nodes": 1,
-    "throughput_fps": 10.55,
-    "latency_median_ms": 80.37,
-    "latency_p95_ms": 132.13,
-    "latency_max_ms": 312.91
+{
+  "1": {
+    "throughput_fps": 11.07,
+    "median_ms": 79.95,
+    "p95_ms": 117.07,
+    "max_ms": 151.57
   },
-  {
-    "nodes": 2,
-    "throughput_fps": 10.8,
-    "latency_median_ms": 81.43,
-    "latency_p95_ms": 128.06,
-    "latency_max_ms": 142.3
+  "2": {
+    "throughput_fps": 9.2,
+    "median_ms": 85.29,
+    "p95_ms": 322.63,
+    "max_ms": 403.59
   },
-  {
-    "nodes": 3,
-    "throughput_fps": 11.24,
-    "latency_median_ms": 78.95,
-    "latency_p95_ms": 114.87,
-    "latency_max_ms": 118.98
+  "3": {
+    "throughput_fps": 10.87,
+    "median_ms": 79.16,
+    "p95_ms": 119.2,
+    "max_ms": 128.75
   },
-  {
-    "nodes": 4,
-    "throughput_fps": 10.99,
-    "latency_median_ms": 80.9,
-    "latency_p95_ms": 119.78,
-    "latency_max_ms": 123.33
+  "4": {
+    "throughput_fps": 10.34,
+    "median_ms": 80.54,
+    "p95_ms": 121.33,
+    "max_ms": 320.75
   },
-  {
-    "nodes": 5,
-    "throughput_fps": 10.53,
-    "latency_median_ms": 87.04,
-    "latency_p95_ms": 140.51,
-    "latency_max_ms": 142.6
+  "5": {
+    "throughput_fps": 7.6,
+    "median_ms": 108.59,
+    "p95_ms": 282.24,
+    "max_ms": 376.6
   },
-  {
-    "nodes": 6,
-    "throughput_fps": 11.1,
-    "latency_median_ms": 80.73,
-    "latency_p95_ms": 116.71,
-    "latency_max_ms": 120.04
+  "6": {
+    "throughput_fps": 10.84,
+    "median_ms": 79.83,
+    "p95_ms": 120.54,
+    "max_ms": 149.74
   },
-  {
-    "nodes": 7,
-    "throughput_fps": 10.78,
-    "latency_median_ms": 80.44,
-    "latency_p95_ms": 139.05,
-    "latency_max_ms": 142.51
+  "7": {
+    "throughput_fps": 11.47,
+    "median_ms": 78.05,
+    "p95_ms": 112.71,
+    "max_ms": 122.73
   },
-  {
-    "nodes": 8,
-    "throughput_fps": 10.98,
-    "latency_median_ms": 79.83,
-    "latency_p95_ms": 114.9,
-    "latency_max_ms": 132.53
+  "8": {
+    "throughput_fps": 11.0,
+    "median_ms": 78.95,
+    "p95_ms": 118.09,
+    "max_ms": 143.96
   }
-]
+}
