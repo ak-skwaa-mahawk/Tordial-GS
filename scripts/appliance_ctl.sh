@@ -8,8 +8,9 @@ case "$1" in
     start)
         echo "[*] Stopping any stale instances..."
         pkill -9 -f "peer_listener_daemon.py" 2>/dev/null || true
+        pkill -9 -f "mesh_bridge_daemon.py" 2>/dev/null || true
         pkill -9 -f "qemu-system-x86_64" 2>/dev/null || true
-        fuser -k 9998/tcp 8089/tcp 2>/dev/null || true
+        fuser -k 9998/tcp 9999/udp 8089/tcp 8765/tcp 2>/dev/null || true
         sleep 1
 
         echo "[*] Booting seL4 microkernel (COM1 -> ~/.sel4_com1.log, COM2 -> :9998)..."
@@ -18,33 +19,42 @@ case "$1" in
         disown
         sleep 3
 
-        echo "[*] Starting Tordial-GS peer listener daemon (:8089 -> ~/.peer_listener.log)..."
+        echo "[*] Starting Mesh Bridge Daemon (UDP :9999 -> WS :8765 -> ~/.mesh_bridge.log)..."
         cd "$TORDIAL_DIR"
+        nohup python3 -u scripts/mesh_bridge_daemon.py > "$HOME/.mesh_bridge.log" 2>&1 &
+        disown
+        sleep 1
+
+        echo "[*] Starting Tordial-GS peer listener daemon (:8089 -> ~/.peer_listener.log)..."
         nohup python3 -u scripts/peer_listener_daemon.py > "$HOME/.peer_listener.log" 2>&1 &
         disown
         sleep 1
 
         echo "[+] Appliance online."
-        pgrep -fl "qemu-system-x86_64|peer_listener_daemon"
+        pgrep -fl "qemu-system-x86_64|peer_listener_daemon|mesh_bridge_daemon"
         ;;
 
     stop)
         echo "[*] Halting sovereign evaluation appliance..."
         pkill -9 -f "peer_listener_daemon.py" 2>/dev/null || true
+        pkill -9 -f "mesh_bridge_daemon.py" 2>/dev/null || true
         pkill -9 -f "qemu-system-x86_64" 2>/dev/null || true
-        fuser -k 9998/tcp 8089/tcp 2>/dev/null || true
+        fuser -k 9998/tcp 9999/udp 8089/tcp 8765/tcp 2>/dev/null || true
         echo "[+] Appliance halted."
         ;;
 
     status)
         echo "=== ACTIVE PROCESSES ==="
-        pgrep -fl "qemu-system-x86_64|peer_listener_daemon" || echo "No active processes."
+        pgrep -fl "qemu-system-x86_64|peer_listener_daemon|mesh_bridge_daemon" || echo "No active processes."
         echo ""
         echo "=== RECENT KERNEL LOG ==="
         tail -n 6 "$HOME/.sel4_com1.log" 2>/dev/null | tr -d '\r' || echo "No kernel log."
         echo ""
         echo "=== RECENT DAEMON LOG ==="
         tail -n 6 "$HOME/.peer_listener.log" 2>/dev/null || echo "No daemon log."
+        echo ""
+        echo "=== RECENT MESH BRIDGE LOG ==="
+        tail -n 6 "$HOME/.mesh_bridge.log" 2>/dev/null || echo "No bridge log."
         ;;
 
     audit)

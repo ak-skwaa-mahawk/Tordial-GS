@@ -11,11 +11,48 @@ REPO_PATH = "/data/data/com.termux/files/home/Tordial-GS"
 PORT = 8089
 COM2_PORT = 9998
 COM2_HOST = "127.0.0.1"
+MESH_UDP_HOST = "127.0.0.1"
+MESH_UDP_PORT = 9999
+import json
 
 # Dynamically link Telephone_port audit pipeline
 TELEPHONE_PATH = "/data/data/com.termux/files/home/Telephone_port"
 if TELEPHONE_PATH not in sys.path:
     sys.path.insert(0, TELEPHONE_PATH)
+
+from audit_contract import (
+    SovereignResponseFrame,
+    SOVA_MAGIC,
+    SOVR_STATUS_SUCCESS,
+    SOVR_FLAG_STATUTORY_DUTY,
+    SOVR_FLAG_CORP_DEFENSE_VALID,
+    SOVR_FLAG_CAN_BE_ADMINISTERED
+)
+
+
+def broadcast_certified_telemetry(resp, digest, expected_digest):
+    """Transmits a microkernel-certified telemetry event to the mesh bridge via UDP."""
+    try:
+        packet = {
+            "type": "SEL4_SOVEREIGN_CERTIFICATE",
+            "timestamp": time.time(),
+            "magic": hex(resp.magic),
+            "status_code": hex(resp.status_code),
+            "flags": {
+                "raw": resp.flags,
+                "statutory_duty": bool(resp.flags & SOVR_FLAG_STATUTORY_DUTY),
+                "corporate_defense_valid": bool(resp.flags & SOVR_FLAG_CORP_DEFENSE_VALID),
+                "can_be_administered_away": bool(resp.flags & SOVR_FLAG_CAN_BE_ADMINISTERED),
+            },
+            "root_hash": digest,
+            "certified": (resp.status_code == SOVR_STATUS_SUCCESS and digest == expected_digest)
+        }
+        raw_json = json.dumps(packet).encode("utf-8")
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.sendto(raw_json, (MESH_UDP_HOST, MESH_UDP_PORT))
+        sock.close()
+    except Exception as e:
+        print(f"[!] [TELEMETRY] Failed to broadcast to mesh bridge: {e}")
 
 def verify_state_with_sel4():
     """Serializes the local state into a SovereignAuditFrame and verifies it with seL4 via COM2."""
@@ -30,7 +67,6 @@ def verify_state_with_sel4():
         client.connect((COM2_HOST, COM2_PORT))
         client.sendall(payload)
 
-        from audit_contract import SovereignResponseFrame, SOVA_MAGIC, SOVR_STATUS_SUCCESS
         resp_buf = bytearray()
         while len(resp_buf) < ctypes.sizeof(SovereignResponseFrame):
             chunk = client.recv(ctypes.sizeof(SovereignResponseFrame) - len(resp_buf))
@@ -45,6 +81,8 @@ def verify_state_with_sel4():
 
         resp = SovereignResponseFrame.from_buffer_copy(resp_buf)
         kernel_digest = bytes(resp.root_hash).hex()
+        broadcast_certified_telemetry(resp, kernel_digest, expected_digest)
+
         if resp.magic == SOVA_MAGIC and resp.status_code == SOVR_STATUS_SUCCESS and kernel_digest == expected_digest:
             print(f"[+] [seL4 AUDIT] Microkernel certified commit state! Flags: {bin(resp.flags)}, Root: {kernel_digest[:16]}...")
             return True
