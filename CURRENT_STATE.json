@@ -1,81 +1,21 @@
 {
-  "seq_id": 26,
-  "timestamp": 1790290213.6189604,
-  "prev_entry_hash": "970c5344ac94edd9ee730fc1cd057bd77182ec99e7f84f939818b3c3073e8b29",
+  "seq_id": 27,
+  "timestamp": 1790291767.184605,
+  "prev_entry_hash": "a1be72ec46d7b07cf0efe016da28eb5f37ab7151fb7a6b2872d7d448818d5e63",
   "magic": "0x534f5641",
-  "status_code": "0x0",
+  "status_code": "0xe002",
   "flags": {
-    "raw": 9,
-    "statutory_duty": true,
+    "raw": 0,
+    "statutory_duty": false,
     "corporate_defense_valid": false,
     "can_be_administered_away": false
   },
-  "root_hash": "de154802cd1da19a38624c54ab004bfb95658243feb72d41b270563e8cb5daea",
-  "certified": true,
-  "inference_scaling_curve": [
-    {
-      "nodes": 1,
-      "throughput_fps": 10.55,
-      "latency_median_ms": 80.37,
-      "latency_p95_ms": 132.13,
-      "latency_max_ms": 312.91
-    },
-    {
-      "nodes": 2,
-      "throughput_fps": 10.8,
-      "latency_median_ms": 81.43,
-      "latency_p95_ms": 128.06,
-      "latency_max_ms": 142.3
-    },
-    {
-      "nodes": 3,
-      "throughput_fps": 11.24,
-      "latency_median_ms": 78.95,
-      "latency_p95_ms": 114.87,
-      "latency_max_ms": 118.98
-    },
-    {
-      "nodes": 4,
-      "throughput_fps": 10.99,
-      "latency_median_ms": 80.9,
-      "latency_p95_ms": 119.78,
-      "latency_max_ms": 123.33
-    },
-    {
-      "nodes": 5,
-      "throughput_fps": 10.53,
-      "latency_median_ms": 87.04,
-      "latency_p95_ms": 140.51,
-      "latency_max_ms": 142.6
-    },
-    {
-      "nodes": 6,
-      "throughput_fps": 11.1,
-      "latency_median_ms": 80.73,
-      "latency_p95_ms": 116.71,
-      "latency_max_ms": 120.04
-    },
-    {
-      "nodes": 7,
-      "throughput_fps": 10.78,
-      "latency_median_ms": 80.44,
-      "latency_p95_ms": 139.05,
-      "latency_max_ms": 142.51
-    },
-    {
-      "nodes": 8,
-      "throughput_fps": 10.98,
-      "latency_median_ms": 79.83,
-      "latency_p95_ms": 114.9,
-      "latency_max_ms": 132.53
-    }
-  ],
-  "last_sequence_id": 26,
-  "last_verification_timestamp": 1790290506.8708827,
-  "uplink_relay": {
-    "protocol": "TLS/WSS",
-    "auth_scheme": "Bearer Token",
-    "outbound_queue_size": 1024,
-    "status": "VERIFIED_AUTHENTICATED_STREAMING"
+  "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "certified": false,
+  "last_sequence_id": 27,
+  "last_verification_timestamp": 1790291775.1714933,
+  "threat_model_seq27": {
+    "anti_replay_test": "VERIFIED_PASSED",
+    "monotonic_sequence_enforced": true
   }
 }
