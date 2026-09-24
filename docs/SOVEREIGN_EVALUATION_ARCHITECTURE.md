@@ -22,7 +22,6 @@ The appliance enforces four primary security invariants across the kernel/user-s
 
 ## 2. Capability Topology Matrix
 
-
 ┌───────────────────────────────┐
 │      seL4 Microkernel         │
 │ (Formally Verified Isolation) │
@@ -49,7 +48,6 @@ seL4_IRQHandler       │               │ seL4_CNode
 │           Tordial-GS Gateway             │
 │  Monotonic Append • Outbound TLS/WSS     │
 └──────────────────────────────────────────┘
-
 
 ---
 
