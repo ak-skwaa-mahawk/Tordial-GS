@@ -1,7 +1,7 @@
 {
-  "seq_id": 2,
-  "timestamp": 1790276902.0669277,
-  "prev_entry_hash": "26ca09bf34e9b47f1701b3f420d3249c7a82d81312325ecac812ae8096afa2fe",
+  "seq_id": 8,
+  "timestamp": 1790278494.716611,
+  "prev_entry_hash": "ea7a62d4a8457753ae59d849743ece3cd7b36dcaaddfc088c6ce9f50ae527f72",
   "magic": "0x534f5641",
   "status_code": "0x0",
   "flags": {
