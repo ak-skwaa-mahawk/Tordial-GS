@@ -3,6 +3,7 @@ import socket
 import time
 import threading
 import sys
+import ctypes
 import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -29,20 +30,26 @@ def verify_state_with_sel4():
         client.connect((COM2_HOST, COM2_PORT))
         client.sendall(payload)
 
-        ack = bytearray()
-        while len(ack) < 32:
-            chunk = client.recv(32 - len(ack))
+        from audit_contract import SovereignResponseFrame, SOVA_MAGIC, SOVR_STATUS_SUCCESS
+        resp_buf = bytearray()
+        while len(resp_buf) < ctypes.sizeof(SovereignResponseFrame):
+            chunk = client.recv(ctypes.sizeof(SovereignResponseFrame) - len(resp_buf))
             if not chunk:
                 break
-            ack.extend(chunk)
+            resp_buf.extend(chunk)
         client.close()
 
-        kernel_digest = ack.hex()
-        if kernel_digest == expected_digest:
-            print(f"[+] [seL4 AUDIT] Microkernel certified commit state! Root Hash: {kernel_digest[:16]}...")
+        if len(resp_buf) < ctypes.sizeof(SovereignResponseFrame):
+            print("[-] [seL4 AUDIT] Truncated response frame from microkernel")
+            return False
+
+        resp = SovereignResponseFrame.from_buffer_copy(resp_buf)
+        kernel_digest = bytes(resp.root_hash).hex()
+        if resp.magic == SOVA_MAGIC and resp.status_code == SOVR_STATUS_SUCCESS and kernel_digest == expected_digest:
+            print(f"[+] [seL4 AUDIT] Microkernel certified commit state! Flags: {bin(resp.flags)}, Root: {kernel_digest[:16]}...")
             return True
         else:
-            print(f"[-] [seL4 AUDIT] Hash mismatch! Expected {expected_digest[:16]}..., got {kernel_digest[:16]}...")
+            print(f"[-] [seL4 AUDIT] Rejection/Mismatch! Status: {hex(resp.status_code)}, Digest: {kernel_digest[:16]}...")
             return False
     except Exception as e:
         print(f"[!] [seL4 AUDIT] seL4 COM2 link offline or uncertified: {e}")
