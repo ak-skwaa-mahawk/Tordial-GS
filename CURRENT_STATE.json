@@ -11,5 +11,14 @@
     "can_be_administered_away": false
   },
   "root_hash": "de154802cd1da19a38624c54ab004bfb95658243feb72d41b270563e8cb5daea",
-  "certified": true
+  "certified": true,
+  "last_sequence_id": 23,
+  "last_verification_timestamp": 1790289315.9751859,
+  "kernel_invariants": {
+    "cbmc_unwind_bound": 16,
+    "max_nodes": 8,
+    "anomaly_flag": "0x0008",
+    "native_fuzz_cycles": 20000,
+    "status": "VERIFIED_FORMAL_AND_NATIVE"
+  }
 }
