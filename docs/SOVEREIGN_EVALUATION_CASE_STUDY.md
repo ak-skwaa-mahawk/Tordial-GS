@@ -113,3 +113,9 @@ Total roundtrip processing—encompassing interrupt line handling, user-space bu
 * **End-to-End Pipeline Validation**:
   - `test_telemetry_ws.py` verified simultaneous COM2 interrupt processing, local UDP relay, and live WebSocket broadcast with 100% roundtrip fidelity.
   - State journal verified through monotonic progression up to sequence ID 24 (`~/.sovereign_audit_journal.jsonl`).
+
+## 8. Multi-Node Q16.16 TinyML Inference Scaling Profile
+
+* **Test Methodology**: 50 consecutive evaluation frames per `node_count` increment ($n = 1 \dots 8$) streamed over interrupt-driven COM2 UART (`127.0.0.1:9998`).
+* **Scaling Invariant**: Linear deterministic complexity $O(n \cdot (D_{in} \cdot D_{hid} + D_{hid} \cdot D_{out}))$.
+* **Results Table**: Recorded in `scaling_results.json`.
