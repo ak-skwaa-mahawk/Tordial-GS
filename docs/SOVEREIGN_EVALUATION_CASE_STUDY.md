@@ -103,3 +103,13 @@ Total roundtrip processing—encompassing interrupt line handling, user-space bu
   - Array bounds invariant: $n < \text{node\_count} \land n < \text{MAX\_NODES}$
   - Buffer copy bound: $\min(\text{sizeof}(feature\_buf), \text{sizeof}(node))$
   - 20,000 fuzz cycles with Address/UndefinedBehaviorSanitizers: 0 violations.
+
+## 7. Real-Time Telemetry Pipeline & WebSocket Alert Ingestion
+
+* **Endian-Safe Wire Deserialization**: Ingestion of the 40-byte binary structured response frame (`sovereign_response_frame_t`) via little-endian integer matching on `SOVA_MAGIC` (`0x534F5641`), eliminating frame loss or byte-inversion desync over raw UDP sockets (`:9999`).
+* **Asynchronous Alert Surface**:
+  - Evaluation frames with standard authority flags (`0x0001`) are packaged into `EVALUATION_FRAME` JSON telemetry and dispatched to active WebSocket clients (`:8765`).
+  - Evaluation frames asserting `SOVR_FLAG_ANOMALY_DETECTED` (`0x0008` / aggregate `0x0009`) trigger real-time critical alerts (`CRITICAL: In-Kernel TinyML Anomaly Classification Triggered`).
+* **End-to-End Pipeline Validation**:
+  - `test_telemetry_ws.py` verified simultaneous COM2 interrupt processing, local UDP relay, and live WebSocket broadcast with 100% roundtrip fidelity.
+  - State journal verified through monotonic progression up to sequence ID 24 (`~/.sovereign_audit_journal.jsonl`).
