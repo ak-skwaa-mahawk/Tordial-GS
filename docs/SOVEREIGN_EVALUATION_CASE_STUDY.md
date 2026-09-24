@@ -119,3 +119,12 @@ Total roundtrip processing—encompassing interrupt line handling, user-space bu
 * **Test Methodology**: 50 consecutive evaluation frames per `node_count` increment ($n = 1 \dots 8$) streamed over interrupt-driven COM2 UART (`127.0.0.1:9998`).
 * **Scaling Invariant**: Linear deterministic complexity $O(n \cdot (D_{in} \cdot D_{hid} + D_{hid} \cdot D_{out}))$.
 * **Results Table**: Recorded in `scaling_results.json`.
+
+## 9. Authenticated Outbound TLS/WSS Remote Mesh Uplink
+
+* **Architecture**: Asynchronous producer-consumer queue (`asyncio.Queue(maxsize=1024)`) in `mesh_bridge_daemon.py` decouples UDP `:9999` frame ingestion from remote TLS transmission.
+* **Security & Authentication**:
+  - Outbound TLS/WSS connections dispatch `Authorization: Bearer <MESH_UPLINK_TOKEN>` headers.
+  - TLS verification configurable via `MESH_UPLINK_VERIFY_TLS`.
+* **Resilience**: Backpressure queue drops stale payloads when saturated (`QueueEmpty` handling) and implements backoff reconnections without blocking the local WebSocket subscriber loop (`:8765`).
+* **Verification**: Proven in `test_uplink_relay.py` against an ephemeral TLS server requiring token authentication, confirming relay of both standard (`flags: 1`) and critical anomaly (`flags: 9`) evaluation payloads.

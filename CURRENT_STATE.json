@@ -69,5 +69,13 @@
       "latency_p95_ms": 114.9,
       "latency_max_ms": 132.53
     }
-  ]
+  ],
+  "last_sequence_id": 26,
+  "last_verification_timestamp": 1790290506.8708827,
+  "uplink_relay": {
+    "protocol": "TLS/WSS",
+    "auth_scheme": "Bearer Token",
+    "outbound_queue_size": 1024,
+    "status": "VERIFIED_AUTHENTICATED_STREAMING"
+  }
 }
