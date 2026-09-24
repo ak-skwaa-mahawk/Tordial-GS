@@ -13,6 +13,9 @@ COM2_PORT = 9998
 COM2_HOST = "127.0.0.1"
 MESH_UDP_HOST = "127.0.0.1"
 MESH_UDP_PORT = 9999
+JOURNAL_PATH = os.path.expanduser("~/.sovereign_audit_journal.jsonl")
+CURRENT_STATE_PATH = os.path.join(REPO_PATH, "CURRENT_STATE.json")
+import hashlib
 import json
 
 # Dynamically link Telephone_port audit pipeline
@@ -54,6 +57,55 @@ def broadcast_certified_telemetry(resp, digest, expected_digest):
     except Exception as e:
         print(f"[!] [TELEMETRY] Failed to broadcast to mesh bridge: {e}")
 
+
+def record_audit_journal_entry(resp, kernel_digest, expected_digest):
+    """Appends certified evaluation to a monotonic hash-chained journal and writes CURRENT_STATE.json."""
+    try:
+        prev_entry_hash = "0000000000000000000000000000000000000000000000000000000000000000"
+        seq_id = 1
+
+        if os.path.exists(JOURNAL_PATH) and os.path.getsize(JOURNAL_PATH) > 0:
+            with open(JOURNAL_PATH, "rb") as jf:
+                lines = jf.readlines()
+                if lines:
+                    last_line = lines[-1].decode("utf-8").strip()
+                    try:
+                        last_record = json.loads(last_line)
+                        seq_id = last_record.get("seq_id", 0) + 1
+                        prev_entry_hash = hashlib.sha256(last_line.encode("utf-8")).hexdigest()
+                    except json.JSONDecodeError:
+                        pass
+
+        entry = {
+            "seq_id": seq_id,
+            "timestamp": time.time(),
+            "prev_entry_hash": prev_entry_hash,
+            "magic": hex(resp.magic),
+            "status_code": hex(resp.status_code),
+            "flags": {
+                "raw": resp.flags,
+                "statutory_duty": bool(resp.flags & SOVR_FLAG_STATUTORY_DUTY),
+                "corporate_defense_valid": bool(resp.flags & SOVR_FLAG_CORP_DEFENSE_VALID),
+                "can_be_administered_away": bool(resp.flags & SOVR_FLAG_CAN_BE_ADMINISTERED),
+            },
+            "root_hash": kernel_digest,
+            "certified": (resp.status_code == SOVR_STATUS_SUCCESS and kernel_digest == expected_digest)
+        }
+
+        entry_line = json.dumps(entry, sort_keys=True)
+        with open(JOURNAL_PATH, "a") as jf:
+            jf.write(entry_line + "\n")
+
+        # Atomic commit of latest state
+        temp_state_path = CURRENT_STATE_PATH + ".tmp"
+        with open(temp_state_path, "w") as sf:
+            json.dump(entry, sf, indent=2)
+        os.replace(temp_state_path, CURRENT_STATE_PATH)
+
+        print(f"[+] [JOURNAL] Monotonic entry #{seq_id} committed (Prev: {prev_entry_hash[:12]}..., Root: {kernel_digest[:12]}...)")
+    except Exception as e:
+        print(f"[!] [JOURNAL] Failed to write journal record: {e}")
+
 def verify_state_with_sel4():
     """Serializes the local state into a SovereignAuditFrame and verifies it with seL4 via COM2."""
     try:
@@ -82,6 +134,7 @@ def verify_state_with_sel4():
         resp = SovereignResponseFrame.from_buffer_copy(resp_buf)
         kernel_digest = bytes(resp.root_hash).hex()
         broadcast_certified_telemetry(resp, kernel_digest, expected_digest)
+        record_audit_journal_entry(resp, kernel_digest, expected_digest)
 
         if resp.magic == SOVA_MAGIC and resp.status_code == SOVR_STATUS_SUCCESS and kernel_digest == expected_digest:
             print(f"[+] [seL4 AUDIT] Microkernel certified commit state! Flags: {bin(resp.flags)}, Root: {kernel_digest[:16]}...")

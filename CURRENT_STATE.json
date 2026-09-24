@@ -1,0 +1,15 @@
+{
+  "seq_id": 2,
+  "timestamp": 1790276902.0669277,
+  "prev_entry_hash": "26ca09bf34e9b47f1701b3f420d3249c7a82d81312325ecac812ae8096afa2fe",
+  "magic": "0x534f5641",
+  "status_code": "0x0",
+  "flags": {
+    "raw": 1,
+    "statutory_duty": true,
+    "corporate_defense_valid": false,
+    "can_be_administered_away": false
+  },
+  "root_hash": "de154802cd1da19a38624c54ab004bfb95658243feb72d41b270563e8cb5daea",
+  "certified": true
+}
