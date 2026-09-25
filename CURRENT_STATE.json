@@ -38,10 +38,12 @@
   "active_sequence": 28,
   "authenticated_key_scaling": {
     "status": "VERIFIED_COMPLETED",
-    "timestamp": 1790311357.2971375,
+    "timestamp": 1790311388.5151541,
+    "wire_frame_bytes": 1152,
+    "quorum_rule": "3_OF_4_ED25519_COMMITTEE",
+    "root_key_matching": "ENFORCED",
     "node_1_fps": 7.32,
     "node_8_fps": 8.26,
-    "node_8_median_ms": 110.26,
-    "key_verification_gate": "ENFORCED"
+    "node_8_median_ms": 110.26
   }
 }
