@@ -35,5 +35,13 @@
     "node_8_fps": 7.66,
     "node_8_median_ms": 116.71
   },
-  "active_sequence": 28
+  "active_sequence": 28,
+  "authenticated_key_scaling": {
+    "status": "VERIFIED_COMPLETED",
+    "timestamp": 1790311357.2971375,
+    "node_1_fps": 7.32,
+    "node_8_fps": 8.26,
+    "node_8_median_ms": 110.26,
+    "key_verification_gate": "ENFORCED"
+  }
 }
