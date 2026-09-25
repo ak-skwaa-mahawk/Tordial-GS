@@ -1,70 +1,71 @@
-#!/bin/bash
-set -e
+#!/bin/sh
+SERVICE_DIR="$HOME/service"
+LOG_DIR="$HOME/.sovereign_logs"
+mkdir -p "$LOG_DIR"
 
-SE4_DIR="$HOME/seL4-workspace/multiserver_build"
-TORDIAL_DIR="$HOME/Tordial-GS"
+cleanup_stale() {
+    pkill -9 -f "runsv" 2>/dev/null || true
+    pkill -9 -f "runsvdir" 2>/dev/null || true
+    pkill -9 -f "peer_listener_daemon.py" 2>/dev/null || true
+    pkill -9 -f "mesh_bridge.py" 2>/dev/null || true
+    pkill -9 -f "qemu-system-x86_64" 2>/dev/null || true
+    fuser -k 9998/tcp 9999/udp 8089/tcp 8765/tcp 2>/dev/null || true
+}
 
 case "$1" in
     start)
-        echo "[*] Stopping any stale instances..."
-        pkill -9 -f "peer_listener_daemon.py" 2>/dev/null || true
-        pkill -9 -f "mesh_bridge_daemon.py" 2>/dev/null || true
-        pkill -9 -f "qemu-system-x86_64" 2>/dev/null || true
-        fuser -k 9998/tcp 9999/udp 8089/tcp 8765/tcp 2>/dev/null || true
+        echo "[*] Cleaning any stale instances..."
+        cleanup_stale
         sleep 1
 
-        echo "[*] Booting seL4 microkernel (COM1 -> ~/.sel4_com1.log, COM2 -> :9998)..."
-        cd "$SE4_DIR"
-        nohup "$HOME/seL4-workspace/run_sel4_com2.sh" images/libraries-3-image-x86_64-pc99 > "$HOME/.sel4_com1.log" 2>&1 &
-        disown
-        sleep 3
+        echo "[*] Launching runit supervisor over $SERVICE_DIR..."
+        runsvdir -P "$SERVICE_DIR" > "$LOG_DIR/runsvdir.log" 2>&1 &
 
-        echo "[*] Starting Mesh Bridge Daemon (UDP :9999 -> WS :8765 -> ~/.mesh_bridge.log)..."
-        cd "$TORDIAL_DIR"
-        nohup python3 -u scripts/mesh_bridge_daemon.py > "$HOME/.mesh_bridge.log" 2>&1 &
-        disown
+        # Wait up to 5 seconds for COM2 port 9998 to be listening
+        retries=10
+        while ! nc -z 127.0.0.1 9998 2>/dev/null && [ $retries -gt 0 ]; do
+            sleep 0.5
+            retries=$((retries - 1))
+        done
+
         sleep 1
-
-        echo "[*] Starting Tordial-GS peer listener daemon (:8089 -> ~/.peer_listener.log)..."
-        nohup python3 -u scripts/peer_listener_daemon.py > "$HOME/.peer_listener.log" 2>&1 &
-        disown
-        sleep 1
-
         echo "[+] Appliance online."
-        pgrep -fl "qemu-system-x86_64|peer_listener_daemon|mesh_bridge_daemon"
+        pgrep -fl "qemu-system-x86_64|peer_listener_daemon|mesh_bridge|runsv"
         ;;
 
     stop)
-        echo "[*] Halting sovereign evaluation appliance..."
-        pkill -9 -f "peer_listener_daemon.py" 2>/dev/null || true
-        pkill -9 -f "mesh_bridge_daemon.py" 2>/dev/null || true
-        pkill -9 -f "qemu-system-x86_64" 2>/dev/null || true
-        fuser -k 9998/tcp 9999/udp 8089/tcp 8765/tcp 2>/dev/null || true
+        echo "[*] Halting sovereign appliance services..."
+        cleanup_stale
         echo "[+] Appliance halted."
+        ;;
+
+    restart)
+        $0 stop
+        sleep 1
+        $0 start
         ;;
 
     status)
         echo "=== ACTIVE PROCESSES ==="
-        pgrep -fl "qemu-system-x86_64|peer_listener_daemon|mesh_bridge_daemon" || echo "No active processes."
+        pgrep -fl "qemu-system-x86_64|peer_listener_daemon|mesh_bridge|runsv" || echo "No active processes."
+        echo ""
+        echo "=== SOCKET / PORT BINDINGS ==="
+        netstat -tuln 2>/dev/null | grep -E ':(9998|9999|8089|8765)' || echo "No active listener ports."
         echo ""
         echo "=== RECENT KERNEL LOG ==="
         tail -n 6 "$HOME/.sel4_com1.log" 2>/dev/null | tr -d '\r' || echo "No kernel log."
-        echo ""
-        echo "=== RECENT DAEMON LOG ==="
-        tail -n 6 "$HOME/.peer_listener.log" 2>/dev/null || echo "No daemon log."
-        echo ""
-        echo "=== RECENT MESH BRIDGE LOG ==="
-        tail -n 6 "$HOME/.mesh_bridge.log" 2>/dev/null || echo "No bridge log."
+        ;;
+
+    logs)
+        tail -n 15 "$LOG_DIR/qemu"/* "$LOG_DIR/mesh_bridge"/* "$LOG_DIR/peer_listener"/* 2>/dev/null
         ;;
 
     audit)
-        echo "[*] Requesting on-demand microkernel certification pass..."
-        curl -s -X POST http://127.0.0.1:8089/audit-now
-        echo ""
+        python3 "$HOME/Tordial-GS/scripts/verify_journal_integrity.py"
         ;;
 
     *)
-        echo "Usage: $0 {start|stop|status|audit}"
+        echo "Usage: $0 {start|stop|restart|status|logs|audit}"
         exit 1
         ;;
 esac
