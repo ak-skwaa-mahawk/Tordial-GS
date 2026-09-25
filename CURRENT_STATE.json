@@ -45,5 +45,13 @@
     "node_1_fps": 7.32,
     "node_8_fps": 8.26,
     "node_8_median_ms": 110.26
+  },
+  "freestanding_crypto_engine": {
+    "status": "OPERATIONAL",
+    "timestamp": 1790313569.5266867,
+    "sha512_provider": "sovereign_crypto.c (FIPS 180-4 compliant freestanding)",
+    "prehash_range_bytes": "0..319",
+    "prehash_digest_len": 64,
+    "key_matching_primitive": "sovereign_crypto_verify_32 (constant-time)"
   }
 }
