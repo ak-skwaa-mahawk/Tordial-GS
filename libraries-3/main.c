@@ -18,3 +18,13 @@ static int verify_quorum_committee(const sovereign_audit_frame_seq28_t *frame) {
     }
     return 0;
 }
+
+/* Ingress loop dispatch */
+if (verify_quorum_committee(incoming) != 0) {
+    printf("rootserver: [COM2 REJECT] Insufficient or invalid quorum committee\n");
+    resp.status_code = SOVR_STATUS_ERR_QUORUM;
+    resp.flags = 0x0000;
+} else {
+    resp.flags |= SOVR_FLAG_QUORUM_VERIFIED;
+    /* Proceed to Evaluate State Hash & TinyML */
+}
