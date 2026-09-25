@@ -1,50 +1,50 @@
 {
   "1": {
-    "throughput_fps": 10.1,
-    "median_ms": 79.02,
-    "p95_ms": 161.32,
-    "max_ms": 328.49
+    "throughput_fps": 10.62,
+    "median_ms": 83.02,
+    "p95_ms": 120.57,
+    "max_ms": 166.73
   },
   "2": {
-    "throughput_fps": 11.16,
-    "median_ms": 78.39,
-    "p95_ms": 130.07,
-    "max_ms": 230.89
+    "throughput_fps": 11.07,
+    "median_ms": 78.35,
+    "p95_ms": 115.28,
+    "max_ms": 118.52
   },
   "3": {
-    "throughput_fps": 9.88,
-    "median_ms": 80.47,
-    "p95_ms": 229.3,
-    "max_ms": 596.57
+    "throughput_fps": 11.01,
+    "median_ms": 78.87,
+    "p95_ms": 119.43,
+    "max_ms": 141.58
   },
   "4": {
-    "throughput_fps": 11.42,
-    "median_ms": 74.09,
-    "p95_ms": 149.91,
-    "max_ms": 195.23
+    "throughput_fps": 10.9,
+    "median_ms": 79.0,
+    "p95_ms": 114.85,
+    "max_ms": 135.01
   },
   "5": {
-    "throughput_fps": 11.01,
-    "median_ms": 81.16,
-    "p95_ms": 115.98,
-    "max_ms": 125.68
+    "throughput_fps": 10.94,
+    "median_ms": 78.82,
+    "p95_ms": 115.44,
+    "max_ms": 135.04
   },
   "6": {
-    "throughput_fps": 10.43,
-    "median_ms": 82.38,
-    "p95_ms": 137.73,
-    "max_ms": 239.6
+    "throughput_fps": 10.88,
+    "median_ms": 79.06,
+    "p95_ms": 132.98,
+    "max_ms": 134.85
   },
   "7": {
-    "throughput_fps": 10.85,
-    "median_ms": 80.22,
-    "p95_ms": 116.2,
-    "max_ms": 150.66
+    "throughput_fps": 11.39,
+    "median_ms": 79.25,
+    "p95_ms": 114.77,
+    "max_ms": 134.21
   },
   "8": {
-    "throughput_fps": 10.7,
-    "median_ms": 81.09,
-    "p95_ms": 118.66,
-    "max_ms": 136.78
+    "throughput_fps": 10.79,
+    "median_ms": 79.66,
+    "p95_ms": 117.36,
+    "max_ms": 142.99
   }
 }

@@ -20,10 +20,10 @@
   },
   "q16_saturation_load_bench": {
     "status": "VERIFIED_COMPLETED",
-    "timestamp": 1790307930.7419384,
+    "timestamp": 1790308375.2220128,
     "invariant_check": "ZERO_DROPPED_FRAMES_MONOTONIC_INGRESS",
-    "node_1_fps": 10.1,
-    "node_8_fps": 10.7,
-    "node_8_median_ms": 81.09
+    "node_1_fps": 10.62,
+    "node_8_fps": 10.79,
+    "node_8_median_ms": 79.66
   }
 }
