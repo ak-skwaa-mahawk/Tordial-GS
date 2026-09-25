@@ -48,10 +48,24 @@
   },
   "freestanding_crypto_engine": {
     "status": "OPERATIONAL",
-    "timestamp": 1790313569.5266867,
+    "timestamp": 1790314902.8957324,
     "sha512_provider": "sovereign_crypto.c (FIPS 180-4 compliant freestanding)",
+    "curve25519_point_decompression": "RFC 8032 16-limb exact field-diff validated",
+    "signature_algorithm": "Ed25519 (detached, 64-byte)",
     "prehash_range_bytes": "0..319",
     "prehash_digest_len": 64,
-    "key_matching_primitive": "sovereign_crypto_verify_32 (constant-time)"
+    "key_matching_primitive": "sovereign_crypto_verify_32 (constant-time)",
+    "quorum_enforcement": {
+      "required_threshold": 3,
+      "max_signers": 4,
+      "active_committee_roots": 4,
+      "status_code_pass": "0x0000",
+      "flags_pass": "0x0011"
+    },
+    "replay_enforcement": {
+      "monotonic_counter": "STRICT_FORWARD",
+      "duplicate_reject_code": "0xE002",
+      "retroverted_reject_code": "0xE002"
+    }
   }
 }
