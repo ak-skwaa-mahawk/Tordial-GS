@@ -1,0 +1,5 @@
+{
+  "contract": "Sequence 28 Multi-Signer Quorum",
+  "committee": ["NODE_U_ESQ", "NODE_LINEAGE_ROOT", "NODE_FED_TRUST", "NODE_CORP_SENTRY"],
+  "threshold": "3_OF_4"
+}
