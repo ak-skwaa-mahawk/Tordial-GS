@@ -67,5 +67,71 @@
       "duplicate_reject_code": "0xE002",
       "retroverted_reject_code": "0xE002"
     }
+  },
+  "scaling_benchmark": {
+    "timestamp": 1790315088.7179232,
+    "iterations_per_node": 50,
+    "workload_profile": "3-of-4 Ed25519 detached signatures + SHA-512 canonical prehash",
+    "complexity": "O(1) strictly bounded",
+    "metrics_by_node_depth": {
+      "1": {
+        "throughput_fps": 5.96,
+        "median_ms": 149.65,
+        "p95_ms": 280.11,
+        "max_ms": 508.59
+      },
+      "2": {
+        "throughput_fps": 6.28,
+        "median_ms": 150.28,
+        "p95_ms": 188.5,
+        "max_ms": 272.88
+      },
+      "3": {
+        "throughput_fps": 6.41,
+        "median_ms": 146.98,
+        "p95_ms": 182.4,
+        "max_ms": 189.66
+      },
+      "4": {
+        "throughput_fps": 6.3,
+        "median_ms": 143.85,
+        "p95_ms": 206.37,
+        "max_ms": 218.46
+      },
+      "5": {
+        "throughput_fps": 6.26,
+        "median_ms": 148.65,
+        "p95_ms": 185.25,
+        "max_ms": 211.35
+      },
+      "6": {
+        "throughput_fps": 6.32,
+        "median_ms": 147.13,
+        "p95_ms": 182.71,
+        "max_ms": 208.96
+      },
+      "7": {
+        "throughput_fps": 6.33,
+        "median_ms": 146.76,
+        "p95_ms": 183.12,
+        "max_ms": 199.9
+      },
+      "8": {
+        "throughput_fps": 6.31,
+        "median_ms": 148.25,
+        "p95_ms": 183.44,
+        "max_ms": 211.51
+      }
+    },
+    "aggregate_performance": {
+      "mean_throughput_fps": 6.27,
+      "nominal_median_ms": 147.69,
+      "bounded_p95_ms": 188.5
+    }
+  },
+  "release_sequence": {
+    "tag": "v1.0.0-seq30",
+    "epoch": 1790315088.71793,
+    "attestation": "Certified bounded Ed25519 verification latency across 1..8 node depth"
   }
 }
