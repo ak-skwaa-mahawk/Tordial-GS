@@ -29,7 +29,7 @@ def compute_entry_hash(entry: dict) -> str:
     ts = entry.get("timestamp", 0.0)
     root_hash = entry.get("root_hash", "")
     flags = entry.get("flags", {})
-    raw_flags = flags.get("raw", 0) if isinstance(flags, dict) else int(flags)
+    raw_flags = flags.get("raw", 0) if isinstance(flags, dict) else (int(flags, 0) if isinstance(flags, str) else int(flags))
     prev_hash = entry.get("prev_entry_hash", "")
     
     canonical_repr = f"{seq_id}:{ts}:{root_hash}:{raw_flags}:{prev_hash}"
@@ -71,7 +71,7 @@ def audit_journal(journal_path: str = JOURNAL_PATH) -> bool:
         root_hash = entry.get("root_hash", "")
         prev_entry_hash = entry.get("prev_entry_hash", "")
         flags = entry.get("flags", {})
-        raw_flags = flags.get("raw", 0) if isinstance(flags, dict) else int(flags)
+        raw_flags = flags.get("raw", 0) if isinstance(flags, dict) else (int(flags, 0) if isinstance(flags, str) else int(flags))
 
         # 1. Check Magic Identifier
         if magic != SOVA_MAGIC_EXPECTED:
