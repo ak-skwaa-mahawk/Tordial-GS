@@ -25,5 +25,14 @@
     "node_1_fps": 10.62,
     "node_8_fps": 10.79,
     "node_8_median_ms": 79.66
+  },
+  "sequence_28_quorum_scaling": {
+    "status": "VERIFIED_COMPLETED",
+    "wire_frame_bytes": 1152,
+    "timestamp": 1790309133.6083152,
+    "quorum_rule": "3_OF_4_ED25519_COMMITTEE",
+    "node_1_fps": 8.07,
+    "node_8_fps": 7.66,
+    "node_8_median_ms": 116.71
   }
 }
