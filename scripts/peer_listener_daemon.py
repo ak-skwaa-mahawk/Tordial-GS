@@ -278,6 +278,8 @@ def run_udp_mesh_listener():
     """Binds to UDP port 9999 with SO_REUSEADDR and dispatches incoming mesh frames."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    if hasattr(socket, "SO_REUSEPORT"):
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
     try:
         sock.bind(("0.0.0.0", MESH_UDP_PORT))
         print(f"[*] [PEER LISTENER] UDP Mesh Gossip listener running on port {MESH_UDP_PORT}...", flush=True)

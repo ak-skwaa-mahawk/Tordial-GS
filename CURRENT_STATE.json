@@ -1,137 +1,15 @@
 {
-  "seq_id": 27,
-  "timestamp": 1790291767.184605,
-  "prev_entry_hash": "a1be72ec46d7b07cf0efe016da28eb5f37ab7151fb7a6b2872d7d448818d5e63",
+  "seq_id": 34,
+  "timestamp": 1791061302.9398046,
+  "prev_entry_hash": "90777ff564b1925f43ee3a6b5dd7f342cd619709353828e37e29cf47b41eab59",
   "magic": "0x534f5641",
-  "status_code": "0xe002",
+  "status_code": "0x0",
   "flags": {
-    "raw": 0,
-    "statutory_duty": false,
+    "raw": 17,
+    "statutory_duty": true,
     "corporate_defense_valid": false,
     "can_be_administered_away": false
   },
-  "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-  "certified": false,
-  "last_sequence_id": 28,
-  "last_verification_timestamp": 1790291775.1714933,
-  "threat_model_seq27": {
-    "anti_replay_test": "VERIFIED_PASSED",
-    "monotonic_sequence_enforced": true
-  },
-  "q16_saturation_load_bench": {
-    "status": "VERIFIED_COMPLETED",
-    "timestamp": 1790308375.2220128,
-    "invariant_check": "ZERO_DROPPED_FRAMES_MONOTONIC_INGRESS",
-    "node_1_fps": 10.62,
-    "node_8_fps": 10.79,
-    "node_8_median_ms": 79.66
-  },
-  "sequence_28_quorum_scaling": {
-    "status": "VERIFIED_COMPLETED",
-    "wire_frame_bytes": 1152,
-    "timestamp": 1790309133.6083152,
-    "quorum_rule": "3_OF_4_ED25519_COMMITTEE",
-    "node_1_fps": 8.07,
-    "node_8_fps": 7.66,
-    "node_8_median_ms": 116.71
-  },
-  "active_sequence": 28,
-  "authenticated_key_scaling": {
-    "status": "VERIFIED_COMPLETED",
-    "timestamp": 1790311388.5151541,
-    "wire_frame_bytes": 1152,
-    "quorum_rule": "3_OF_4_ED25519_COMMITTEE",
-    "root_key_matching": "ENFORCED",
-    "node_1_fps": 7.32,
-    "node_8_fps": 8.26,
-    "node_8_median_ms": 110.26
-  },
-  "freestanding_crypto_engine": {
-    "status": "OPERATIONAL",
-    "timestamp": 1790314902.8957324,
-    "sha512_provider": "sovereign_crypto.c (FIPS 180-4 compliant freestanding)",
-    "curve25519_point_decompression": "RFC 8032 16-limb exact field-diff validated",
-    "signature_algorithm": "Ed25519 (detached, 64-byte)",
-    "prehash_range_bytes": "0..319",
-    "prehash_digest_len": 64,
-    "key_matching_primitive": "sovereign_crypto_verify_32 (constant-time)",
-    "quorum_enforcement": {
-      "required_threshold": 3,
-      "max_signers": 4,
-      "active_committee_roots": 4,
-      "status_code_pass": "0x0000",
-      "flags_pass": "0x0011"
-    },
-    "replay_enforcement": {
-      "monotonic_counter": "STRICT_FORWARD",
-      "duplicate_reject_code": "0xE002",
-      "retroverted_reject_code": "0xE002"
-    }
-  },
-  "scaling_benchmark": {
-    "timestamp": 1790315088.7179232,
-    "iterations_per_node": 50,
-    "workload_profile": "3-of-4 Ed25519 detached signatures + SHA-512 canonical prehash",
-    "complexity": "O(1) strictly bounded",
-    "metrics_by_node_depth": {
-      "1": {
-        "throughput_fps": 5.96,
-        "median_ms": 149.65,
-        "p95_ms": 280.11,
-        "max_ms": 508.59
-      },
-      "2": {
-        "throughput_fps": 6.28,
-        "median_ms": 150.28,
-        "p95_ms": 188.5,
-        "max_ms": 272.88
-      },
-      "3": {
-        "throughput_fps": 6.41,
-        "median_ms": 146.98,
-        "p95_ms": 182.4,
-        "max_ms": 189.66
-      },
-      "4": {
-        "throughput_fps": 6.3,
-        "median_ms": 143.85,
-        "p95_ms": 206.37,
-        "max_ms": 218.46
-      },
-      "5": {
-        "throughput_fps": 6.26,
-        "median_ms": 148.65,
-        "p95_ms": 185.25,
-        "max_ms": 211.35
-      },
-      "6": {
-        "throughput_fps": 6.32,
-        "median_ms": 147.13,
-        "p95_ms": 182.71,
-        "max_ms": 208.96
-      },
-      "7": {
-        "throughput_fps": 6.33,
-        "median_ms": 146.76,
-        "p95_ms": 183.12,
-        "max_ms": 199.9
-      },
-      "8": {
-        "throughput_fps": 6.31,
-        "median_ms": 148.25,
-        "p95_ms": 183.44,
-        "max_ms": 211.51
-      }
-    },
-    "aggregate_performance": {
-      "mean_throughput_fps": 6.27,
-      "nominal_median_ms": 147.69,
-      "bounded_p95_ms": 188.5
-    }
-  },
-  "release_sequence": {
-    "tag": "v1.0.0-seq30",
-    "epoch": 1790315088.71793,
-    "attestation": "Certified bounded Ed25519 verification latency across 1..8 node depth"
-  }
+  "root_hash": "273b9ba0788069c63601eefedcba58e2d94e00082810dacef2e0c62f2bac229c",
+  "certified": true
 }

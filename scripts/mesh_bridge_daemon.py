@@ -90,6 +90,9 @@ async def ws_handler(websocket):
 async def udp_listener_loop():
     loop = asyncio.get_running_loop()
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    if hasattr(socket, "SO_REUSEPORT"):
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
     sock.bind(("0.0.0.0", UDP_PORT))
     sock.setblocking(False)
     logging.info(f"Listening for UDP bursts on 0.0.0.0:{UDP_PORT}")
