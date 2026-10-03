@@ -217,6 +217,81 @@ def sync_from_peers():
     except Exception as e:
         print(f"[!] [AUTO-SYNC] Error during peer synchronization pass: {e}")
 
+
+PEERS_JSON_PATH = os.path.expanduser("~/peers.json")
+
+def ingest_synara_anchor(pkt, addr):
+    """Processes SYNARA_RAD_HARD_ANCHOR datagrams and records state in ~/peers.json."""
+    try:
+        anchor_data = {
+            "node_id": "SYNARA-CORE-ANCHOR",
+            "anchor_id": pkt.get("anchor_id"),
+            "peer_ip": addr[0],
+            "active_regime": pkt.get("active_regime"),
+            "waveform_checksum": pkt.get("waveform_checksum"),
+            "coherence": pkt.get("coherence"),
+            "source": pkt.get("source", "ISST_TOFT_RUST_BACKEND"),
+            "timestamp": pkt.get("timestamp", time.time()),
+            "status": "ACTIVE",
+            "last_seen": time.time()
+        }
+
+        registry = {}
+        if os.path.exists(PEERS_JSON_PATH):
+            with open(PEERS_JSON_PATH, "r") as pf:
+                try:
+                    registry = json.load(pf)
+                except Exception:
+                    registry = {}
+
+        if not isinstance(registry, dict):
+            registry = {"node_id": "TORDIAL-EDGE-01", "peers": []}
+
+        if "peers" not in registry or not isinstance(registry["peers"], list):
+            registry["peers"] = []
+
+        updated = False
+        for idx, peer in enumerate(registry["peers"]):
+            if isinstance(peer, dict) and peer.get("node_id") == "SYNARA-CORE-ANCHOR":
+                registry["peers"][idx] = anchor_data
+                updated = True
+                break
+
+        if not updated:
+            registry["peers"].append(anchor_data)
+
+        registry["active_state_anchor"] = {
+            "anchor_id": pkt.get("anchor_id"),
+            "regime": pkt.get("active_regime"),
+            "checksum": pkt.get("waveform_checksum"),
+            "timestamp": pkt.get("timestamp", time.time())
+        }
+
+        with open(PEERS_JSON_PATH, "w") as pf:
+            json.dump(registry, pf, indent=2)
+
+        print(f"[*] [UDP INGEST] Anchored {anchor_data['anchor_id']} [{anchor_data['active_regime']}] to peers.json", flush=True)
+    except Exception as e:
+        print(f"[!] [UDP INGEST] Error writing anchor: {e}", flush=True)
+
+def run_udp_mesh_listener():
+    """Binds to UDP port 9999 with SO_REUSEADDR and dispatches incoming mesh frames."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        sock.bind(("0.0.0.0", MESH_UDP_PORT))
+        print(f"[*] [PEER LISTENER] UDP Mesh Gossip listener running on port {MESH_UDP_PORT}...", flush=True)
+        while True:
+            data, addr = sock.recvfrom(4096)
+            try:
+                pkt = json.loads(data.decode("utf-8", errors="ignore"))
+                if pkt.get("type") == "SYNARA_RAD_HARD_ANCHOR":
+                    ingest_synara_anchor(pkt, addr)
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"[!] [PEER LISTENER] UDP listener socket failure on port {MESH_UDP_PORT}: {e}", flush=True)
+
 class WebhookHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/sync":
@@ -255,6 +330,8 @@ def run_periodic_polling(interval_seconds=10):
         sync_from_peers()
 
 if __name__ == "__main__":
+    udp_thread = threading.Thread(target=run_udp_mesh_listener, daemon=True)
+    udp_thread.start()
     http_thread = threading.Thread(target=run_http_server, daemon=True)
     http_thread.start()
     run_periodic_polling(interval_seconds=10)
