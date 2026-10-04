@@ -5,26 +5,38 @@ from typing import Dict, Any, List, Optional
 from core.bridge.xai_client import XAIBridgeEngine, TOOL_SCHEMAS
 from tests.fixtures.replica_benchmark import REPLICA_BENCHMARK_TASKS
 
+import urllib.request
+import urllib.error
+
 def call_xai_api(messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Dict[str, Any]:
     api_key = os.environ.get("XAI_API_KEY", "")
     if not api_key:
         raise ValueError("XAI_API_KEY environment variable not set.")
-    return {
-        "choices": [{
-            "message": {
-                "role": "assistant",
-                "content": "Trajectory execution complete.",
-                "tool_calls": []
-            }
-        }]
+    url = "https://api.x.ai/v1/chat/completions"
+    payload = {
+        "model": "grok-4",
+        "messages": messages,
+        "tools": tools,
+        "tool_choice": "auto",
+        "temperature": 0.2
     }
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
 async def evaluate_grok_task(task_key: str, task_data: Dict[str, Any], engine: Optional[XAIBridgeEngine] = None) -> Dict[str, Any]:
     engine = engine or XAIBridgeEngine()
     system_prompt = "You are an autonomous scientific reasoning agent with sandbox execution and DAG planning tools."
     messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"Task: {task_data.get('description', '')}"}
+        {"role": "user", "content": f"Task: {getattr(task_data, 'description', task_data.get('description', '') if isinstance(task_data, dict) else str(task_data))}"}
     ]
     step_rewards: List[float] = []
     collected_metrics: Dict[str, Any] = {}
@@ -61,7 +73,7 @@ async def evaluate_grok_task(task_key: str, task_data: Dict[str, Any], engine: O
                 "content": json.dumps(res)
             })
 
-    invariants = task_data.get("invariants", {})
+    invariants = getattr(task_data, "invariant_bounds", getattr(task_data, "invariants", {}))
     invariants_passed = True
     for k, bounds in invariants.items():
         if k in collected_metrics and isinstance(bounds, (list, tuple)) and len(bounds) == 2:

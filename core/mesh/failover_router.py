@@ -7,9 +7,8 @@ class DynamicFailoverMeshRouter(SovereignMeshRouter):
     def __init__(self, node_id: str = "TORDIAL-EDGE-01", failure_threshold_sec: float = 30.0):
         super().__init__(node_id=node_id)
         self.failure_threshold_sec = failure_threshold_sec
-        self.peer_heartbeats: Dict[str, float] = {
-            "TORDIAL-EDGE-02": time.time()
-        }
+        default_peers = ["HEADSCALE-ALPHA", "HEADSCALE-BETA", "HEADSCALE-GAMMA", "ALPHA", "BETA", "GAMMA"]
+        self.peer_heartbeats: Dict[str, float] = {p: time.time() for p in default_peers}
         self.peer_penalty_multipliers: Dict[str, float] = {k: 1.0 for k in self.peer_heartbeats}
 
     def record_peer_heartbeat(self, peer_id: str):
