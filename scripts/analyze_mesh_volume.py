@@ -42,7 +42,7 @@ def analyze_mesh_volume():
     print("==========================================================")
     print(f"Total Settled Transactions : {total_txs:,}")
     print(f"Total Gross Volume Routed  : {total_volume_sats:,} sats")
-    print(f"Total Node Payouts         : {total_node_payouts:,} sats ({(total_node_payouts/total_volume_sats)*100:.1f}% if total_volume_sats > 0 else 0.0%)")
+    print(f"Total Node Payouts         : {total_node_payouts:,} sats ({(total_node_payouts/total_volume_sats*100) if total_volume_sats > 0 else 0.0:.1f}%)")
     print(f"Total Floor Reserve Sunk   : {total_floor_sats:,} sats ({(total_floor_sats/total_volume_sats)*100:.1f}%)")
     print(f"Average Hops per Burst     : {avg_hops:.2f}")
 
