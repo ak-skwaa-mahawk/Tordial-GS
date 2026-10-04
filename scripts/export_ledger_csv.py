@@ -10,7 +10,9 @@ import csv
 import time
 import re
 
-LEDGER_PATH = Path("/data/data/com.termux/files/home/GitHub_Workspace/Kimi-K2/ledger.json")
+from pathlib import Path
+from core.mesh.ledger_settlement import LEDGER_PATH as _STR_LEDGER_PATH
+LEDGER_PATH = Path(_STR_LEDGER_PATH)
 SETTLEMENT_LOG = Path.home() / ".settlement_worker.log"
 OUTPUT_CSV_DIR = Path.home() / "reports"
 

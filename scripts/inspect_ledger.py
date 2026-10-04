@@ -7,7 +7,7 @@ if str(REPO_ROOT) not in sys.path:
 
 import json
 
-LEDGER_PATH = Path("/data/data/com.termux/files/home/GitHub_Workspace/Kimi-K2/ledger.json")
+from core.mesh.ledger_settlement import LEDGER_PATH
 
 def inspect_ledger():
     if not LEDGER_PATH.exists():
