@@ -4,7 +4,11 @@ import tempfile
 import time
 from typing import Dict, Any, List
 
-LEDGER_PATH = "/data/data/com.termux/files/home/GitHub_Workspace/Kimi-K2/ledger.json"
+_BASE_DIR = os.environ.get("TORDIAL_DATA_DIR")
+if not _BASE_DIR:
+    _TERMUX_DIR = "/data/data/com.termux/files/home/Tordial-GS/data"
+    _BASE_DIR = _TERMUX_DIR if os.path.exists("/data/data/com.termux") else os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
+LEDGER_PATH = os.path.join(_BASE_DIR, "mesh_ledger.json")
 
 DEFAULT_LEDGER = {
     "version": "1.0.0",
