@@ -10,3 +10,4 @@ reports/*.json
 reports/*.md
 grok_eval_run.log
 releases/
+data/
