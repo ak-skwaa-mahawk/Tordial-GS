@@ -42,7 +42,7 @@ class GeminiBridge:
         payload = {
             "system_instruction": {"parts": [{"text": system_prompt}]},
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1024},
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048},
         }
         body_bytes = json.dumps(payload).encode("utf-8")
         last_error = ""
