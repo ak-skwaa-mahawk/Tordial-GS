@@ -71,3 +71,31 @@ def test_grpc_stream_route_bursts(grpc_channel):
         assert resp.decision.status == router_pb2.E8_HIGHWAY_DISPATCHED
         assert resp.decision.selected_root_index >= 0
         assert resp.process_duration_ns > 0
+
+def test_grpc_update_telemetry(grpc_channel):
+    stub = router_pb2_grpc.SovereignMeshServiceStub(grpc_channel)
+    telemetry = router_pb2.TelemetryVector(
+        latency_ms=3.2,
+        queue_depth=1.0,
+        thermal_headroom=0.01,
+        battery_reserve=0.95,
+        packet_loss_rate=0.001,
+        bandwidth_capacity=0.99,
+        memory_pressure=0.15,
+        compute_load=0.001
+    )
+    req = router_pb2.TelemetryUpdateRequest(
+        node_id="PEER-EDGE-09",
+        telemetry=telemetry,
+        timestamp_epoch_ms=1700000000000
+    )
+    resp = stub.UpdateTelemetry(req)
+    assert resp.accepted is True
+    assert resp.current_sequence >= 0
+
+def test_grpc_get_settlement_status(grpc_channel):
+    stub = router_pb2_grpc.SovereignMeshServiceStub(grpc_channel)
+    req = router_pb2.SettlementStatusRequest(tx_id="tx_test_mesh_01")
+    resp = stub.GetSettlementStatus(req)
+    assert resp.record.tx_id == "tx_test_mesh_01"
+    assert resp.record.settlement_status in ["NOT_FOUND", "CONFIRMED"]

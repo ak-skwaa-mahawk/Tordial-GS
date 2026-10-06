@@ -82,6 +82,66 @@ class SovereignMeshServicer(router_pb2_grpc.SovereignMeshServiceServicer):
         for request in request_iterator:
             yield self.RouteBurst(request, context)
 
+    def UpdateTelemetry(self, request, context):
+        tel = request.telemetry
+        telemetry_array = np.array([
+            tel.latency_ms,
+            tel.queue_depth,
+            tel.thermal_headroom,
+            tel.battery_reserve,
+            tel.packet_loss_rate,
+            tel.bandwidth_capacity,
+            tel.memory_pressure,
+            tel.compute_load,
+        ], dtype=float)
+        
+        # Ingest into router state tracking
+        if hasattr(self.router, "update_peer_telemetry"):
+            self.router.update_peer_telemetry(request.node_id, telemetry_array)
+
+        seq = getattr(self.router, "current_sequence", 1)
+        return router_pb2.TelemetryUpdateResponse(
+            accepted=True,
+            current_sequence=int(seq)
+        )
+
+    def GetSettlementStatus(self, request, context):
+        tx_id = request.tx_id
+        # Query router or ledger settlement records
+        ledger = getattr(self.router, "ledger", None)
+        record = None
+        if ledger and hasattr(ledger, "get_transaction"):
+            record = ledger.get_transaction(tx_id)
+
+        if record:
+            pb_record = router_pb2.SettlementJournalRecord(
+                tx_id=str(record.get("tx_id", tx_id)),
+                timestamp_epoch=int(record.get("timestamp_epoch", 0)),
+                origin_node=str(record.get("origin_node", "")),
+                hop_count=int(record.get("hop_count", 0)),
+                route_hops=list(record.get("route_hops", [])),
+                total_budget_sats=int(record.get("total_budget_sats", 0)),
+                node_payout_sats=int(record.get("node_payout_sats", 0)),
+                floor_reserve_sats=int(record.get("floor_reserve_sats", 0)),
+                xrpl_tx_hash=str(record.get("xrpl_tx_hash", "")),
+                settlement_status=str(record.get("settlement_status", "CONFIRMED"))
+            )
+            return router_pb2.SettlementStatusResponse(
+                record=pb_record,
+                is_certified=True,
+                journal_root_hash=str(record.get("root_hash", "0x0"))
+            )
+
+        # Default fallback response for non-existent or un-flushed tx
+        return router_pb2.SettlementStatusResponse(
+            record=router_pb2.SettlementJournalRecord(
+                tx_id=tx_id,
+                settlement_status="NOT_FOUND"
+            ),
+            is_certified=False,
+            journal_root_hash=""
+        )
+
 def serve(host: str = "127.0.0.1", port: int = 50055):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
     router_pb2_grpc.add_SovereignMeshServiceServicer_to_server(
