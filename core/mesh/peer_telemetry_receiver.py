@@ -2,8 +2,8 @@
 
 Listens for signed peer metric packets over loopback UDP. Verifies cryptographic
 signatures, enriches transit delay metrics in a non-destructive outer envelope,
-dispatches routing evaluations asynchronously to prevent ingress blocking, and
-streams verified raw events to Google Drive.
+fans out packet replicas to loopback tap (18889), dispatches routing evaluations
+asynchronously to prevent ingress blocking, and streams verified raw events to Google Drive.
 """
 
 import socket
@@ -22,6 +22,7 @@ from core.mesh.crypto_envelope import verify_packet
 from core.mesh.telemetry_metrics import enrich_transit_metrics
 
 LISTEN_PORT = 18888
+TAP_PORT = 18889
 BUFFER_SIZE = 4096
 
 class PeerReceiver:
@@ -30,6 +31,7 @@ class PeerReceiver:
         self.offloader = CloudOffloadEngine()
         self.upload_queue = queue.Queue()
         self.running = True
+        self.tap_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.worker = threading.Thread(target=self._vault_worker, daemon=True)
         self.worker.start()
 
@@ -45,7 +47,6 @@ class PeerReceiver:
                 print(f"[-] Vault worker exception: {e}")
 
     def _async_heal(self, root_idx: int, phase_drift: float, lyapunov: float):
-        """Asynchronous routing evaluation to preserve microsecond ingress processing."""
         try:
             print(f"[!] Background evaluation active for Root #{root_idx}...")
             eval_res = self.router.evaluate_vector(root_idx, phase_drift, lyapunov)
@@ -82,6 +83,12 @@ class PeerReceiver:
 
                 print(f"[*] Valid packet from {addr}: Root #{root_idx} | Drift={phase_drift} | λ={lyapunov} | Delay={delay_ms}ms")
 
+                # Fan-out replicate to tap port for live stream viewers
+                try:
+                    self.tap_sock.sendto(data, ("127.0.0.1", TAP_PORT))
+                except Exception:
+                    pass
+
                 # Preserve verified packet intact alongside transit metadata
                 vault_record = {
                     "signed_packet": packet,
@@ -108,6 +115,7 @@ class PeerReceiver:
         finally:
             self.running = False
             sock.close()
+            self.tap_sock.close()
             self.upload_queue.join()
             print("[+] Vault sync complete.")
 

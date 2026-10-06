@@ -15,7 +15,7 @@ from core.mesh.telemetry_metrics import enrich_transit_metrics
 
 LISTEN_PORT = 18889  # Broadcast or mirror port
 
-def stream_listener(port: int = 18888):
+def stream_listener(port: int = 18889):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     # Enable address reuse for non-intrusive sniffing
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -58,5 +58,5 @@ def stream_listener(port: int = 18888):
         sock.close()
 
 if __name__ == "__main__":
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 18888
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 18889
     stream_listener(port)
