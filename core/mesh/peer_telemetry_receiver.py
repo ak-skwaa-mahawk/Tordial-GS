@@ -2,7 +2,8 @@
 
 Listens for signed peer metric packets over loopback UDP. Verifies cryptographic
 signatures, enriches transit delay metrics in a non-destructive outer envelope,
-evaluates metric drift through GeminiBridge, and streams verified raw events to Google Drive.
+dispatches routing evaluations asynchronously to prevent ingress blocking, and
+streams verified raw events to Google Drive.
 """
 
 import socket
@@ -43,6 +44,17 @@ class PeerReceiver:
             except Exception as e:
                 print(f"[-] Vault worker exception: {e}")
 
+    def _async_heal(self, root_idx: int, phase_drift: float, lyapunov: float):
+        """Asynchronous routing evaluation to preserve microsecond ingress processing."""
+        try:
+            print(f"[!] Background evaluation active for Root #{root_idx}...")
+            eval_res = self.router.evaluate_vector(root_idx, phase_drift, lyapunov)
+            if "ROUTE_DEVIANT" in eval_res.get("verdict", "").upper():
+                print(f"[!] Deviance confirmed. Running autonomous healer...")
+                heal_deviant_vector(root_idx)
+        except Exception as e:
+            print(f"[-] Healer dispatch error on Root #{root_idx}: {e}")
+
     def start(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind(("127.0.0.1", LISTEN_PORT))
@@ -81,13 +93,13 @@ class PeerReceiver:
                 target = f"telemetry/packets/last_packet_root_{root_idx}.json"
                 self.upload_queue.put((target, vault_record))
 
-                # Envelope gate
+                # Envelope gate (Async non-blocking dispatch)
                 if abs(phase_drift) > 0.001 or lyapunov > -1.0:
-                    print(f"[!] Metric divergence on Root #{root_idx}. Routing verification...")
-                    eval_res = self.router.evaluate_vector(root_idx, phase_drift, lyapunov)
-                    if "ROUTE_DEVIANT" in eval_res.get("verdict", "").upper():
-                        print(f"[!] Deviance confirmed. Running autonomous healer...")
-                        heal_deviant_vector(root_idx)
+                    threading.Thread(
+                        target=self._async_heal,
+                        args=(root_idx, phase_drift, lyapunov),
+                        daemon=True
+                    ).start()
                 else:
                     print(f"[+] Root #{root_idx} within sovereign stability envelope.")
 
