@@ -2,8 +2,8 @@
 
 Listens for signed peer metric packets over loopback UDP. Verifies cryptographic
 signatures, enriches transit delay metrics in a non-destructive outer envelope,
-fans out packet replicas to loopback tap (18889), dispatches routing evaluations
-asynchronously to prevent ingress blocking, and streams verified raw events to Google Drive.
+fans out packet replicas to loopback tap (18889), applies token-bucket ingress rate limiting,
+dispatches routing evaluations asynchronously, and streams verified raw events to Google Drive.
 """
 
 import socket
@@ -12,6 +12,7 @@ import os
 import sys
 import queue
 import threading
+import time
 
 sys.path.insert(0, os.path.expanduser("~/Tordial-GS"))
 
@@ -24,16 +25,36 @@ from core.mesh.telemetry_metrics import enrich_transit_metrics
 LISTEN_PORT = 18888
 TAP_PORT = 18889
 BUFFER_SIZE = 4096
+BURST_CAPACITY = 250.0
+REFILL_RATE_PER_SEC = 100.0
 
 class PeerReceiver:
     def __init__(self):
         self.router = E8GeodesicRouter()
         self.offloader = CloudOffloadEngine()
-        self.upload_queue = queue.Queue()
+        self.upload_queue = queue.Queue(maxsize=1000)
         self.running = True
         self.tap_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        
+        # Token-bucket rate limiter state
+        self.tokens = BURST_CAPACITY
+        self.last_refill = time.time()
+        self.dropped_packets = 0
+        self.processed_packets = 0
+
         self.worker = threading.Thread(target=self._vault_worker, daemon=True)
         self.worker.start()
+
+    def _allow_packet(self) -> bool:
+        now = time.time()
+        delta = now - self.last_refill
+        self.last_refill = now
+        self.tokens = min(BURST_CAPACITY, self.tokens + (delta * REFILL_RATE_PER_SEC))
+        
+        if self.tokens >= 1.0:
+            self.tokens -= 1.0
+            return True
+        return False
 
     def _vault_worker(self):
         while self.running or not self.upload_queue.empty():
@@ -64,6 +85,11 @@ class PeerReceiver:
         try:
             while self.running:
                 data, addr = sock.recvfrom(BUFFER_SIZE)
+                
+                if not self._allow_packet():
+                    self.dropped_packets += 1
+                    continue
+
                 try:
                     packet = json.loads(data.decode("utf-8"))
                 except Exception:
@@ -80,6 +106,7 @@ class PeerReceiver:
                 root_idx = payload.get("root_index", 12)
                 phase_drift = payload.get("phase_drift", 0.0)
                 lyapunov = payload.get("lyapunov", -6.992)
+                self.processed_packets += 1
 
                 print(f"[*] Valid packet from {addr}: Root #{root_idx} | Drift={phase_drift} | λ={lyapunov} | Delay={delay_ms}ms")
 
@@ -98,7 +125,10 @@ class PeerReceiver:
                     }
                 }
                 target = f"telemetry/packets/last_packet_root_{root_idx}.json"
-                self.upload_queue.put((target, vault_record))
+                try:
+                    self.upload_queue.put_nowait((target, vault_record))
+                except queue.Full:
+                    self.dropped_packets += 1
 
                 # Envelope gate (Async non-blocking dispatch)
                 if abs(phase_drift) > 0.001 or lyapunov > -1.0:
@@ -117,7 +147,7 @@ class PeerReceiver:
             sock.close()
             self.tap_sock.close()
             self.upload_queue.join()
-            print("[+] Vault sync complete.")
+            print(f"[+] Vault sync complete. (Processed={self.processed_packets}, Dropped={self.dropped_packets})")
 
 if __name__ == "__main__":
     receiver = PeerReceiver()
