@@ -1,0 +1,23 @@
+{
+  "audit_timestamp": "2026-10-06T01:48:43.819514+00:00",
+  "git_commit": "ce1ba87",
+  "version": "v1.0.0",
+  "architecture": "aarch64",
+  "python_runtime": "3.14.6",
+  "metrics": {
+    "sequential_throughput_dps": 69192.6,
+    "p50_latency_us": 12.81,
+    "p95_latency_us": 19.01,
+    "p99_latency_us": 20.94,
+    "mean_latency_us": 14.05,
+    "batch_simd_projections_per_sec": 1424314.7,
+    "full_lifecycle_cycles_per_sec": 39794.3,
+    "mean_lifecycle_time_us": 25.13
+  },
+  "invariants_verified": [
+    "attractor_convergence_3.770434",
+    "toft_79hz_gate_threshold_resonance",
+    "audit_journal_seq_39_certified",
+    "ledger_csv_timestamp_alignment"
+  ]
+}
