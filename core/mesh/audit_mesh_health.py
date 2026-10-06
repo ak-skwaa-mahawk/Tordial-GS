@@ -2,7 +2,7 @@
 
 Verifies running daemons, tests remote vault reachability/capacity,
 validates remote cloud vault states, certifies cryptographic packet envelopes,
-and computes mesh-wide transport jitter statistics.
+computes mesh-wide transport jitter statistics, and audits active alerts.
 """
 
 import subprocess
@@ -25,8 +25,10 @@ def audit():
     # 1. Process Status
     flusher_alive = check_process("log_flusher.py")
     receiver_alive = check_process("peer_telemetry_receiver.py")
+    monitor_alive = check_process("mesh_monitor.py")
     print(f"[*] Log Flusher Daemon:       {'RUNNING' if flusher_alive else 'STOPPED'}")
     print(f"[*] Telemetry Receiver Daemon: {'RUNNING' if receiver_alive else 'STOPPED'}")
+    print(f"[*] Continuous Monitor Daemon: {'RUNNING' if monitor_alive else 'STOPPED'}")
 
     # 2. Remote Vault Health & Storage Probe
     v_health = probe_vault_health()
@@ -70,7 +72,22 @@ def audit():
         stats = compute_jitter_stats(delays)
         print(f"\n[*] Transport Dispersion:     Mean={stats['mean_delay_ms']}ms | Jitter(σ)={stats['jitter_ms']}ms | Min/Max=[{stats['min_delay_ms']}, {stats['max_delay_ms']}]ms")
 
-    # 5. Local Disk Footprint
+    # 5. Remote Alerts Inspection
+    alerts_res = subprocess.run(["rclone", "ls", "gdrive:tordial_mesh_vault/telemetry/alerts", "--log-level", "ERROR"], capture_output=True, text=True)
+    alert_lines = alerts_res.stdout.strip().splitlines() if alerts_res.stdout.strip() else []
+    print(f"[*] Recorded Vault Alerts:    {len(alert_lines)} event(s) logged")
+    if alert_lines:
+        latest_file = alert_lines[-1].split()[-1]
+        cat_alert = subprocess.run(["rclone", "cat", f"gdrive:tordial_mesh_vault/telemetry/alerts/{latest_file}", "--log-level", "ERROR"], capture_output=True, text=True)
+        try:
+            alert_json = json.loads(cat_alert.stdout)
+            alert_type = alert_json.get("type", "MODEL_FAILOVER")
+            reason = alert_json.get("reason") or alert_json.get("details", {}).get("reason", "N/A")
+            print(f"    └── Latest [{latest_file}]: Type={alert_type} | Detail={reason}")
+        except Exception:
+            print(f"    └── Latest [{latest_file}]")
+
+    # 6. Local Disk Footprint
     git_clean = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout.strip() == ""
     print(f"\n[*] Working Tree Hygiene:      {'CLEAN' if git_clean else 'DIRTY'}")
 
