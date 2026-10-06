@@ -47,10 +47,13 @@ class SovereignMeshServicer(router_pb2_grpc.SovereignMeshServiceServicer):
         raw_result = self.router.route_burst(telemetry_array, budget_sats=request.budget_sats)
         decision_data = raw_result.get("decision", {})
 
-        status_enum = STATUS_MAP.get(
-            decision_data.get("status", ""),
-            router_pb2.DISPATCH_STATUS_UNSPECIFIED
-        )
+        raw_status = decision_data.get("status", "")
+        if raw_status in STATUS_MAP:
+            status_enum = STATUS_MAP[raw_status]
+        elif any(k in raw_status for k in ["REJECT", "RESET", "DRIFT", "GATE"]):
+            status_enum = router_pb2.PRESSURE_GATE_REJECTED
+        else:
+            status_enum = router_pb2.DISPATCH_STATUS_UNSPECIFIED
 
         decision = router_pb2.RouteDecision(
             status=status_enum,
