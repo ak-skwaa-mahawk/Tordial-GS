@@ -1,8 +1,8 @@
 """Sovereign Peer Telemetry Receiver and Autonomous Arbiter.
 
-Listens for incoming peer metric packets over loopback UDP. Evaluates anomalous
-metric drift through GeminiBridge and offloads raw events directly to Google Drive
-using a non-blocking queue.
+Listens for signed peer metric packets over loopback UDP. Verifies cryptographic
+signatures, evaluates metric drift through GeminiBridge, and streams verified raw
+events to Google Drive.
 """
 
 import socket
@@ -11,13 +11,13 @@ import os
 import sys
 import queue
 import threading
-import time
 
 sys.path.insert(0, os.path.expanduser("~/Tordial-GS"))
 
 from core.mesh.e8_router import E8GeodesicRouter
 from core.mesh.autonomous_healer import heal_deviant_vector
 from core.mesh.cloud_offload import CloudOffloadEngine
+from core.mesh.crypto_envelope import verify_packet
 
 LISTEN_PORT = 18888
 BUFFER_SIZE = 4096
@@ -45,7 +45,7 @@ class PeerReceiver:
     def start(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind(("127.0.0.1", LISTEN_PORT))
-        print(f"[+] Peer Telemetry Receiver bound to 127.0.0.1:{LISTEN_PORT}")
+        print(f"[+] Authenticated Peer Receiver bound to 127.0.0.1:{LISTEN_PORT}")
 
         try:
             while self.running:
@@ -55,13 +55,18 @@ class PeerReceiver:
                 except Exception:
                     continue
 
-                root_idx = packet.get("root_index", 12)
-                phase_drift = packet.get("phase_drift", 0.0)
-                lyapunov = packet.get("lyapunov", -6.992)
+                valid, payload = verify_packet(packet)
+                if not valid:
+                    print(f"[-] FORGED PACKET from {addr}. Signature check failed. Dropping.")
+                    continue
 
-                print(f"[*] Ingest from {addr}: Root #{root_idx} | Drift={phase_drift} | λ={lyapunov}")
+                root_idx = payload.get("root_index", 12)
+                phase_drift = payload.get("phase_drift", 0.0)
+                lyapunov = payload.get("lyapunov", -6.992)
 
-                # Queue raw packet for cloud offload without blocking socket ingest
+                print(f"[*] Valid packet from {addr}: Root #{root_idx} | Drift={phase_drift} | λ={lyapunov}")
+
+                # Offload signed packet state
                 target = f"telemetry/packets/last_packet_root_{root_idx}.json"
                 self.upload_queue.put((target, packet))
 
@@ -80,7 +85,6 @@ class PeerReceiver:
         finally:
             self.running = False
             sock.close()
-            print("[*] Flushing pending vault uploads...")
             self.upload_queue.join()
             print("[+] Vault sync complete.")
 
