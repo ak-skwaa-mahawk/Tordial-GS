@@ -1,0 +1,9 @@
+services:
+  test-suite:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["pytest", "-v", "--cov=core"]
+    environment:
+      - PYTHONPATH=.
+      - TERMUX_TEST_ENV=0
