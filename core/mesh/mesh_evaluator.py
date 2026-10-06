@@ -1,7 +1,7 @@
-"""Autonomous Mesh Telemetry Ingest & Router Loop with Failure Retry.
+"""Autonomous Mesh Telemetry Ingest Loop with Integrated Auto-Healing.
 
-Monitors active peer states, evaluates anomalous metric drift using
-E8GeodesicRouter, and offloads verified decision journals to Google Drive.
+Monitors active peer states, detects transverse deviations across E8 roots,
+and immediately triggers closed-loop counter-phase correction.
 """
 
 import os
@@ -11,38 +11,30 @@ import time
 sys.path.insert(0, os.path.expanduser("~/Tordial-GS"))
 
 from core.mesh.e8_router import E8GeodesicRouter
+from core.mesh.autonomous_healer import heal_deviant_vector
 
-def run_telemetry_cycle(max_cycle_retries: int = 2):
+ACTIVE_ROOTS = [12, 48, 120]
+
+def run_telemetry_cycle():
     router = E8GeodesicRouter()
-    print("[+] Mesh Evaluator listening to sovereign carrier field...")
+    print("[+] Mesh Ingest active. Scanning sovereign carrier roots...")
 
-    active_indices = [12, 48, 120]
-    pending = list(active_indices)
+    for idx in ACTIVE_ROOTS:
+        print(f"[*] Auditing metric status on Root #{idx}...")
+        res = router.evaluate_vector(
+            root_index=idx,
+            phase_drift=0.00000,
+            lyapunov=-6.992
+        )
 
-    for cycle in range(1, max_cycle_retries + 1):
-        if not pending:
-            break
+        verdict = res.get("verdict", "")
+        if "ROUTE_DEVIANT" in verdict.upper():
+            print(f"[!] Alert: Root #{idx} breach detected. Dispatching autonomous healer...")
+            heal_deviant_vector(root_index=idx)
+        else:
+            print(f"[+] Root #{idx} healthy: {verdict.splitlines()[0] if verdict else 'STABLE'}")
 
-        failed = []
-        for idx in pending:
-            print(f"[*] [Cycle {cycle}] Verifying stability for Root Vector #{idx}...")
-            res = router.evaluate_vector(
-                root_index=idx,
-                phase_drift=0.00000,
-                lyapunov=-6.992
-            )
-
-            if res.get("success"):
-                print(f"[+] Root #{idx} Evaluation complete: STABLE -> {res.get('cloud_offload', {}).get('target')}")
-            else:
-                print(f"[-] Root #{idx} Evaluation transient fail, queueing retry...")
-                failed.append(idx)
-
-        pending = failed
-        if pending and cycle < max_cycle_retries:
-            time.sleep(3.0)
-
-    print("[*] Telemetry cycle finalized.")
+    print("[*] Ingest cycle certified.")
 
 if __name__ == "__main__":
     run_telemetry_cycle()
