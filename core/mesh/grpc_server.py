@@ -68,7 +68,7 @@ class SovereignMeshServicer(router_pb2_grpc.SovereignMeshServiceServicer):
             process_duration_ns=t_elapsed_ns
         )
 
-def serve(host: str = "127.0.0.1", port: int = 50051):
+def serve(host: str = "127.0.0.1", port: int = 50055):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
     router_pb2_grpc.add_SovereignMeshServiceServicer_to_server(
         SovereignMeshServicer(), server
