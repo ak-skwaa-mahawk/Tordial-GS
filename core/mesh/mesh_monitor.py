@@ -2,7 +2,7 @@
 
 Periodically queries remote packet snapshots for active E8 carrier roots,
 computes dynamic dispersion statistics, alerts on topological anomalies,
-and mirrors aggregate telemetry digests to Google Drive.
+mirrors aggregate telemetry digests, and records time-series trends to Google Drive.
 """
 
 import time
@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.expanduser("~/Tordial-GS"))
 from core.mesh.jitter_analyzer import compute_jitter_stats
 from core.mesh.cloud_offload import CloudOffloadEngine
 from core.mesh.crypto_envelope import verify_packet
+from core.mesh.telemetry_timeseries import TelemetryTimeSeries
 
 CARRIER_ROOTS = [0, 12, 24, 48, 72, 120, 144, 216]
 MONITOR_INTERVAL_SEC = 60
@@ -22,6 +23,7 @@ MONITOR_INTERVAL_SEC = 60
 class MeshMonitor:
     def __init__(self):
         self.offloader = CloudOffloadEngine()
+        self.timeseries = TelemetryTimeSeries()
 
     def run_cycle(self) -> dict:
         delays = []
@@ -29,7 +31,6 @@ class MeshMonitor:
 
         for r in CARRIER_ROOTS:
             path = f"telemetry/packets/last_packet_root_{r}.json"
-            # Read state using rclone cat
             import subprocess
             res = subprocess.run(["rclone", "cat", f"gdrive:tordial_mesh_vault/{path}", "--log-level", "ERROR"],
                                  capture_output=True, text=True)
@@ -68,8 +69,9 @@ class MeshMonitor:
             ) if root_states else False
         }
 
-        # Offload consolidated digest to cloud vault
+        # Offload latest digest and append to rolling historical time-series
         self.offloader.put_state("telemetry/metrics/manifold_health_latest.json", digest)
+        self.timeseries.append_sample(digest)
         return digest
 
 if __name__ == "__main__":
