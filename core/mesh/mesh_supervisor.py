@@ -1,7 +1,7 @@
 """Sovereign Mesh Supervisor.
 
 Provides idempotent process lifecycle controls for background daemons:
-peer_telemetry_receiver and log_flusher.
+peer_telemetry_receiver, log_flusher, and mesh_monitor.
 """
 
 import sys
@@ -17,6 +17,10 @@ DAEMONS = {
     "flusher": {
         "pattern": "log_flusher.py",
         "cmd": ["python3", "-u", "-c", "import time, subprocess\nwhile True:\n    subprocess.run(['python3', 'core/mesh/log_flusher.py'])\n    time.sleep(300)"]
+    },
+    "monitor": {
+        "pattern": "mesh_monitor.py",
+        "cmd": ["python3", "-u", "-c", "import time, subprocess\nwhile True:\n    subprocess.run(['python3', 'core/mesh/mesh_monitor.py'])\n    time.sleep(60)"]
     }
 }
 
