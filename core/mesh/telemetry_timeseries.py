@@ -1,12 +1,15 @@
 """Rolling Time-Series Dispersion and Attractor Drift Recorder.
 
 Maintains rolling temporal history of mesh transport dispersion and Lyapunov
-convergence metrics to expose long-term degradation patterns.
+convergence metrics to expose long-term degradation patterns, hydrating
+existing snapshots from the sovereign vault upon startup.
 """
 
 import time
+import json
 import os
 import sys
+import subprocess
 
 sys.path.insert(0, os.path.expanduser("~/Tordial-GS"))
 from core.mesh.cloud_offload import CloudOffloadEngine
@@ -14,9 +17,28 @@ from core.mesh.cloud_offload import CloudOffloadEngine
 MAX_LOCAL_WINDOW = 120  # Keep 120 intervals (2 hours at 60s intervals)
 
 class TelemetryTimeSeries:
-    def __init__(self):
+    def __init__(self, hydrate: bool = True):
         self.offloader = CloudOffloadEngine()
         self.history: list[dict] = []
+        if hydrate:
+            self._hydrate_from_vault()
+
+    def _hydrate_from_vault(self):
+        try:
+            target = "gdrive:tordial_mesh_vault/telemetry/metrics/dispersion_timeseries.json"
+            res = subprocess.run(
+                ["rclone", "cat", target, "--log-level", "ERROR"],
+                capture_output=True,
+                text=True,
+                timeout=15
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                data = json.loads(res.stdout)
+                samples = data.get("samples", [])
+                if isinstance(samples, list):
+                    self.history = samples[-MAX_LOCAL_WINDOW:]
+        except Exception:
+            pass
 
     def append_sample(self, digest: dict) -> dict:
         entry = {
