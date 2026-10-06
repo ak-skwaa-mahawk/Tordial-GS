@@ -35,10 +35,15 @@ def audit():
             print(f"[-] Root #{r}: Vault record missing or unreachable.")
             continue
         try:
-            pkt = json.loads(res.stdout)
-            valid, _ = verify_packet(pkt)
+            record = json.loads(res.stdout)
+            # Unwrap outer envelope if present
+            pkt = record.get("signed_packet", record)
+            transit = record.get("transit_metrics", {})
+            delay_str = f" | Delay={transit.get('transit_delay_ms')}ms" if transit else ""
+
+            valid, payload = verify_packet(pkt)
             sig_status = "VALID" if valid else "LEGACY / UNSIGNED"
-            print(f"[+] Root #{r}: Signature {sig_status} | Payload={pkt.get('phase_drift', 0.0)} rad, λ={pkt.get('lyapunov')}")
+            print(f"[+] Root #{r}: Signature {sig_status} | Payload={payload.get('phase_drift', 0.0)} rad, λ={payload.get('lyapunov')}{delay_str}")
         except Exception as e:
             print(f"[-] Root #{r}: Parse failure ({e})")
 

@@ -1,8 +1,8 @@
 """Sovereign Peer Telemetry Receiver and Autonomous Arbiter.
 
 Listens for signed peer metric packets over loopback UDP. Verifies cryptographic
-signatures, enriches transit delay metrics, evaluates metric drift through GeminiBridge,
-and streams verified raw events to Google Drive.
+signatures, enriches transit delay metrics in a non-destructive outer envelope,
+evaluates metric drift through GeminiBridge, and streams verified raw events to Google Drive.
 """
 
 import socket
@@ -61,19 +61,25 @@ class PeerReceiver:
                     print(f"[-] FORGED PACKET from {addr}. Signature check failed. Dropping.")
                     continue
 
-                # Enrich with ingress epoch & transit latency
-                enriched_packet = enrich_transit_metrics(packet)
+                enriched_meta = enrich_transit_metrics(payload)
+                delay_ms = enriched_meta.get("transit_delay_ms", 0.0)
 
                 root_idx = payload.get("root_index", 12)
                 phase_drift = payload.get("phase_drift", 0.0)
                 lyapunov = payload.get("lyapunov", -6.992)
-                delay_ms = enriched_packet.get("transit_delay_ms", 0.0)
 
                 print(f"[*] Valid packet from {addr}: Root #{root_idx} | Drift={phase_drift} | λ={lyapunov} | Delay={delay_ms}ms")
 
-                # Offload enriched packet state
+                # Preserve verified packet intact alongside transit metadata
+                vault_record = {
+                    "signed_packet": packet,
+                    "transit_metrics": {
+                        "rx_epoch": enriched_meta["rx_epoch"],
+                        "transit_delay_ms": delay_ms
+                    }
+                }
                 target = f"telemetry/packets/last_packet_root_{root_idx}.json"
-                self.upload_queue.put((target, enriched_packet))
+                self.upload_queue.put((target, vault_record))
 
                 # Envelope gate
                 if abs(phase_drift) > 0.001 or lyapunov > -1.0:
