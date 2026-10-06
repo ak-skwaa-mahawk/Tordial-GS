@@ -27,7 +27,8 @@ async def run_e8_burst_simulation(steps: int = 50, dt: float = 0.01) -> Dict[str
     logger.info(f"🚀 Starting continuous E8 burst simulation ({steps} steps)...")
 
     for step in range(steps):
-        noise = np.random.normal(0, 0.05, size=8)
+        noise = np.random.normal(0, 0.01, size=8)
+        noise[7] = np.random.normal(0, 0.001)
         state = base_state + noise
 
         if step % 15 == 14:
