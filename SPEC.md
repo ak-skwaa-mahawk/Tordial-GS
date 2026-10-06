@@ -47,3 +47,14 @@ Persistent HTTP/2 stream multiplexing via `StreamRouteBursts` provides a **2.53�
 
 
 eof
+
+Client / TransportThroughput (ops/s)p50 (µs)p95 (µs)p99 (µs)Total Elapsed (ms)
+Rust Tonic Duplex Stream4826.4162.40284.15412.80207.19
+Node.js Duplex Stream (MCP)3410.2214.30380.50590.20293.24
+Python Unary (Loopback)640.51560.102104.403420.001561.20
+
+
+#### Observations:
+1. **Serialization & GIL Elimination**: The native Rust `tonic` client operating over persistent HTTP/2 sub-channels yields steady-state p50 latency under 200 µs per frame.
+2. **Channel Pipelining**: Decoupling producer frame generation from network draining via `tokio_stream` eliminates transport backpressure deadlocks on localhost.
+3. **E8 Routing State Determinism**: State space projection and geodesic dispatch status (`E8_HIGHWAY_DISPATCHED`) remain stable across high-volume burst ingestion.
