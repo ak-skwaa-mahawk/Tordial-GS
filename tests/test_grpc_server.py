@@ -43,3 +43,31 @@ def test_grpc_route_burst(grpc_channel):
     assert resp.decision.status == router_pb2.E8_HIGHWAY_DISPATCHED
     assert resp.decision.selected_root_index >= 0
     assert resp.process_duration_ns > 0
+
+def test_grpc_stream_route_bursts(grpc_channel):
+    stub = router_pb2_grpc.SovereignMeshServiceStub(grpc_channel)
+
+    def generate_requests(count=10):
+        for i in range(count):
+            telemetry = router_pb2.TelemetryVector(
+                latency_ms=4.0 + (i * 0.01),
+                queue_depth=3.0,
+                thermal_headroom=0.01,
+                battery_reserve=0.02,
+                packet_loss_rate=3.5,
+                bandwidth_capacity=0.98,
+                memory_pressure=0.2,
+                compute_load=0.002
+            )
+            yield router_pb2.RouteBurstRequest(
+                origin_node_id=f"STREAM-CLIENT-{i}",
+                telemetry=telemetry,
+                budget_sats=500
+            )
+
+    responses = list(stub.StreamRouteBursts(generate_requests(10)))
+    assert len(responses) == 10
+    for resp in responses:
+        assert resp.decision.status == router_pb2.E8_HIGHWAY_DISPATCHED
+        assert resp.decision.selected_root_index >= 0
+        assert resp.process_duration_ns > 0

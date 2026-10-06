@@ -74,6 +74,14 @@ class SovereignMeshServicer(router_pb2_grpc.SovereignMeshServiceServicer):
             process_duration_ns=t_elapsed_ns
         )
 
+    def StreamRouteBursts(self, request_iterator, context):
+        """
+        Bidirectional streaming RPC handler for continuous high-rate telemetry pipelines.
+        Yields a RouteBurstResponse immediately for every ingested RouteBurstRequest frame.
+        """
+        for request in request_iterator:
+            yield self.RouteBurst(request, context)
+
 def serve(host: str = "127.0.0.1", port: int = 50055):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
     router_pb2_grpc.add_SovereignMeshServiceServicer_to_server(
