@@ -36,3 +36,14 @@ Measured over 1,000 operational telemetry frames across the `SovereignMeshServic
 
 ### Streaming Advantage
 Persistent HTTP/2 stream multiplexing via `StreamRouteBursts` provides a **2.53× throughput increase** and cuts median end-to-end routing latency from $5.34\ \text{ms}$ down to $1.31\ \text{ms}$, making it the required transport mode for real-time edge telemetry feeds.
+
+## High-Throughput Edge Client Benchmarks (`isst_toft_mesh`)
+
+### Protocol: Native Rust HTTP/2 Duplex Stream (`tonic`)
+* **Transport**: Direct HTTP/2 Duplex Streaming via `SovereignMeshService/StreamRouteBursts`
+* **Test Node**: `EDGE-GRPC-01` / `RUST-EDGE-xxxx`
+* **Frame Sample**: 1,000 continuous frames pipelined via `tokio::sync::mpsc`
+* **Target Endpoint**: `127.0.0.1:50055`
+
+
+eof
