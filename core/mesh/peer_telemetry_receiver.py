@@ -1,8 +1,8 @@
 """Sovereign Peer Telemetry Receiver and Autonomous Arbiter.
 
 Listens for signed peer metric packets over loopback UDP. Verifies cryptographic
-signatures, evaluates metric drift through GeminiBridge, and streams verified raw
-events to Google Drive.
+signatures, enriches transit delay metrics, evaluates metric drift through GeminiBridge,
+and streams verified raw events to Google Drive.
 """
 
 import socket
@@ -18,6 +18,7 @@ from core.mesh.e8_router import E8GeodesicRouter
 from core.mesh.autonomous_healer import heal_deviant_vector
 from core.mesh.cloud_offload import CloudOffloadEngine
 from core.mesh.crypto_envelope import verify_packet
+from core.mesh.telemetry_metrics import enrich_transit_metrics
 
 LISTEN_PORT = 18888
 BUFFER_SIZE = 4096
@@ -60,15 +61,19 @@ class PeerReceiver:
                     print(f"[-] FORGED PACKET from {addr}. Signature check failed. Dropping.")
                     continue
 
+                # Enrich with ingress epoch & transit latency
+                enriched_packet = enrich_transit_metrics(packet)
+
                 root_idx = payload.get("root_index", 12)
                 phase_drift = payload.get("phase_drift", 0.0)
                 lyapunov = payload.get("lyapunov", -6.992)
+                delay_ms = enriched_packet.get("transit_delay_ms", 0.0)
 
-                print(f"[*] Valid packet from {addr}: Root #{root_idx} | Drift={phase_drift} | λ={lyapunov}")
+                print(f"[*] Valid packet from {addr}: Root #{root_idx} | Drift={phase_drift} | λ={lyapunov} | Delay={delay_ms}ms")
 
-                # Offload signed packet state
+                # Offload enriched packet state
                 target = f"telemetry/packets/last_packet_root_{root_idx}.json"
-                self.upload_queue.put((target, packet))
+                self.upload_queue.put((target, enriched_packet))
 
                 # Envelope gate
                 if abs(phase_drift) > 0.001 or lyapunov > -1.0:
