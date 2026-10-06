@@ -1,4 +1,4 @@
-"""Gemini / Sovereign Mesh Bridge with Model Fallback Cascade, Jitter, and Timeout Recovery.
+"""Gemini / Sovereign Mesh Bridge with Full Multi-Part Reassembly and Lite Fallback.
 
 Targeting gen-lang-client-0886380232 with automatic failover across verified models.
 """
@@ -13,9 +13,10 @@ import socket
 
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 MODEL_CASCADE = [
+    "gemini-3.6-flash",
+    "gemini-3.5-flash-lite",
     "gemini-3.8-flash",
     "gemini-3.7-flash",
-    "gemini-3.6-flash",
     "gemini-3.5-flash",
 ]
 
@@ -30,7 +31,7 @@ class GeminiBridge:
         prompt: str,
         system_prompt: str = "You are an autonomous scientific reasoning agent.",
         retries: int = 3,
-        backoff_sec: float = 2.0,
+        backoff_sec: float = 3.0,
     ) -> dict:
         if not self.api_key:
             return {"success": False, "error": "GEMINI_API_KEY is not set."}
@@ -42,7 +43,10 @@ class GeminiBridge:
         payload = {
             "system_instruction": {"parts": [{"text": system_prompt}]},
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048},
+            "generationConfig": {
+                "temperature": 0.2,
+                "maxOutputTokens": 2048
+            },
         }
         body_bytes = json.dumps(payload).encode("utf-8")
         last_error = ""
@@ -59,7 +63,7 @@ class GeminiBridge:
                 )
 
                 try:
-                    with urllib.request.urlopen(req, timeout=60) as resp:
+                    with urllib.request.urlopen(req, timeout=45) as resp:
                         data = json.loads(resp.read().decode("utf-8"))
                         cand_list = data.get("candidates", [])
                         if not cand_list:
@@ -69,19 +73,13 @@ class GeminiBridge:
                                 "raw": data,
                             }
 
-                        text = (
-                            cand_list[0]
-                            .get("content", {})
-                            .get("parts", [{}])[0]
-                            .get("text", "")
-                        )
-                        tokens = data.get("usageMetadata", {}).get(
-                            "totalTokenCount", 0
-                        )
+                        parts = cand_list[0].get("content", {}).get("parts", [])
+                        full_text = "".join(p.get("text", "") for p in parts)
+                        tokens = data.get("usageMetadata", {}).get("totalTokenCount", 0)
 
                         return {
                             "success": True,
-                            "content": text.strip(),
+                            "content": full_text.strip(),
                             "tokens_used": tokens,
                             "model": current_model,
                         }
@@ -91,7 +89,7 @@ class GeminiBridge:
                     last_error = f"HTTP {e.code} on {current_model}: {err_body}"
 
                     if e.code in (429, 503):
-                        sleep_time = (backoff_sec * (2 ** (attempt - 1))) + random.uniform(0.5, 1.5)
+                        sleep_time = (backoff_sec * (2 ** (attempt - 1))) + random.uniform(1.0, 2.5)
                         print(
                             f"[!] {current_model} saturated (HTTP {e.code}). Retrying in {sleep_time:.1f}s (attempt {attempt}/{retries})..."
                         )
@@ -103,8 +101,8 @@ class GeminiBridge:
                         return {"success": False, "error": last_error}
 
                 except (urllib.error.URLError, TimeoutError, socket.timeout) as e:
-                    last_error = f"Timeout/URLError on {current_model}: {str(e)}"
-                    sleep_time = (backoff_sec * (2 ** (attempt - 1))) + random.uniform(1.0, 2.0)
+                    last_error = f"Timeout on {current_model}: {str(e)}"
+                    sleep_time = (backoff_sec * (2 ** (attempt - 1))) + random.uniform(1.0, 2.5)
                     print(
                         f"[!] {current_model} timed out. Retrying in {sleep_time:.1f}s (attempt {attempt}/{retries})..."
                     )
