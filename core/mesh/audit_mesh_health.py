@@ -38,7 +38,7 @@ def audit():
 
     # 3. Vault Sync Audit
     print("\n[*] Auditing Remote Vault Signatures...")
-    roots = [12, 48, 120]
+    roots = [0, 12, 24, 48, 72, 120, 144, 216]
     for r in roots:
         target = f"gdrive:tordial_mesh_vault/telemetry/packets/last_packet_root_{r}.json"
         res = subprocess.run(["rclone", "cat", target, "--log-level", "ERROR"], capture_output=True, text=True)
