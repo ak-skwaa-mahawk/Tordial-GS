@@ -21,15 +21,18 @@ class E8GeodesicRouter:
 
     def evaluate_vector(self, root_index: int, phase_drift: float, lyapunov: float) -> dict:
         prompt = (
-            f"Analyze routing vector for E8 root index #{root_index}. "
-            f"Observed Phase Drift: {phase_drift} rad, Lyapunov Exponent: {lyapunov}. "
-            f"Determine if transverse contraction maintains sovereign mesh stability. "
-            f"Return status formatted as ROUTE_STABLE or ROUTE_DEVIANT with vector delta."
+            f"Analyze routing vector for E8 root index #{root_index}.\n"
+            f"Observed Phase Drift: {phase_drift} rad\n"
+            f"Lyapunov Exponent: {lyapunov}\n\n"
+            f"Instructions:\n"
+            f"1. Sentence 1 MUST start with either 'STATUS: ROUTE_STABLE' or 'STATUS: ROUTE_DEVIANT'.\n"
+            f"2. Provide an 8-dimensional corrective delta vector [Δθ₁..Δθ₈] if deviant.\n"
+            f"3. Keep proof concise."
         )
 
         res = self.bridge.query(
             prompt=prompt,
-            system_prompt="You are the E8 Topological Mesh Router. Evaluate metric contraction with precision."
+            system_prompt="You are the E8 Topological Mesh Router. Output strict status headers."
         )
 
         decision = {
@@ -44,7 +47,6 @@ class E8GeodesicRouter:
             "verdict": res.get("content", "").strip() if res.get("success") else res.get("error")
         }
 
-        # Pipe routing journal directly to Google Drive
         target_path = f"telemetry/routing/root_{root_index}_eval.json"
         offload_result = self.offloader.put_state(target_path, decision)
         decision["cloud_offload"] = offload_result
