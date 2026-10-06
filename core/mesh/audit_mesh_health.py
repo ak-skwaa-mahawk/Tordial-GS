@@ -1,7 +1,8 @@
 """Sovereign Mesh Health and Vault Verification Audit.
 
 Verifies running daemons, tests remote vault reachability/capacity,
-validates remote cloud vault states, and certifies cryptographic packet envelopes.
+validates remote cloud vault states, certifies cryptographic packet envelopes,
+and computes mesh-wide transport jitter statistics.
 """
 
 import subprocess
@@ -12,6 +13,7 @@ import os
 sys.path.insert(0, os.path.expanduser("~/Tordial-GS"))
 from core.mesh.crypto_envelope import verify_packet
 from core.mesh.vault_watchdog import probe_vault_health
+from core.mesh.jitter_analyzer import compute_jitter_stats
 
 def check_process(name: str) -> bool:
     res = subprocess.run(["pgrep", "-f", name], capture_output=True, text=True)
@@ -36,9 +38,11 @@ def audit():
     else:
         print(f"[-] Remote Vault Status:      {status_label} ({latency} ms RTT | Error: {v_health.get('error', 'None')})")
 
-    # 3. Vault Sync Audit
+    # 3. Vault Sync Audit & Jitter Sampling
     print("\n[*] Auditing Remote Vault Signatures...")
     roots = [0, 12, 24, 48, 72, 120, 144, 216]
+    delays = []
+    
     for r in roots:
         target = f"gdrive:tordial_mesh_vault/telemetry/packets/last_packet_root_{r}.json"
         res = subprocess.run(["rclone", "cat", target, "--log-level", "ERROR"], capture_output=True, text=True)
@@ -49,7 +53,11 @@ def audit():
             record = json.loads(res.stdout)
             pkt = record.get("signed_packet", record)
             transit = record.get("transit_metrics", {})
-            delay_str = f" | Delay={transit.get('transit_delay_ms')}ms" if transit else ""
+            delay_val = transit.get("transit_delay_ms")
+            delay_str = f" | Delay={delay_val}ms" if delay_val is not None else ""
+
+            if delay_val is not None:
+                delays.append(float(delay_val))
 
             valid, payload = verify_packet(pkt)
             sig_status = "VALID" if valid else "LEGACY / UNSIGNED"
@@ -57,7 +65,12 @@ def audit():
         except Exception as e:
             print(f"[-] Root #{r}: Parse failure ({e})")
 
-    # 4. Local Disk Footprint
+    # 4. Statistical Jitter Evaluation
+    if delays:
+        stats = compute_jitter_stats(delays)
+        print(f"\n[*] Transport Dispersion:     Mean={stats['mean_delay_ms']}ms | Jitter(σ)={stats['jitter_ms']}ms | Min/Max=[{stats['min_delay_ms']}, {stats['max_delay_ms']}]ms")
+
+    # 5. Local Disk Footprint
     git_clean = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout.strip() == ""
     print(f"\n[*] Working Tree Hygiene:      {'CLEAN' if git_clean else 'DIRTY'}")
 
