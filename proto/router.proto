@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package tordial.v1;
+
+option go_package = "github.com/ak-skwaa-mahawk/tordial-gs/gen/go/v1;tordialv1";
+option java_multiple_files = true;
+option java_package = "com.tordial.v1";
+
+service SovereignMeshService {
+  rpc RouteBurst(RouteBurstRequest) returns (RouteBurstResponse);
+  rpc StreamRouteBursts(stream RouteBurstRequest) returns (stream RouteBurstResponse);
+  rpc UpdateTelemetry(TelemetryUpdateRequest) returns (TelemetryUpdateResponse);
+  rpc GetSettlementStatus(SettlementStatusRequest) returns (SettlementStatusResponse);
+}
+
+message TelemetryVector {
+  double latency_ms = 1;
+  double queue_depth = 2;
+  double thermal_headroom = 3;
+  double battery_reserve = 4;
+  double packet_loss_rate = 5;
+  double bandwidth_capacity = 6;
+  double memory_pressure = 7;
+  double compute_load = 8;
+}
+
+enum DispatchStatus {
+  DISPATCH_STATUS_UNSPECIFIED = 0;
+  E8_HIGHWAY_DISPATCHED = 1;
+  PRESSURE_GATE_REJECTED = 2;
+  THERMAL_THROTTLE_HELD = 3;
+  INSUFFICIENT_BUDGET = 4;
+  TOPOLOGICAL_FAULT = 5;
+}
+
+message RouteDecision {
+  DispatchStatus status = 1;
+  uint32 selected_root_index = 2;
+  double dispatch_weight = 3;
+  double mass_norm = 4;
+  double phase_drift = 5;
+  string target_peer_id = 6;
+}
+
+message SettlementAllocation {
+  string recipient_node_id = 1;
+  uint64 payout_sats = 2;
+}
+
+message SettlementJournalRecord {
+  string tx_id = 1;
+  uint64 timestamp_epoch = 2;
+  string origin_node = 3;
+  uint32 hop_count = 4;
+  repeated string route_hops = 5;
+  uint64 total_budget_sats = 6;
+  uint64 node_payout_sats = 7;
+  uint64 floor_reserve_sats = 8;
+  string xrpl_tx_hash = 9;
+  string settlement_status = 10;
+}
+
+message RouteBurstRequest {
+  string origin_node_id = 1;
+  TelemetryVector telemetry = 2;
+  uint64 budget_sats = 3;
+  string payload_digest = 4;
+  int64 timestamp_epoch_ms = 5;
+}
+
+message RouteBurstResponse {
+  string node_id = 1;
+  uint64 budget_sats = 2;
+  RouteDecision decision = 3;
+  repeated SettlementAllocation allocations = 4;
+  string settled_balance_status = 5;
+  int64 process_duration_ns = 6;
+}
+
+message TelemetryUpdateRequest {
+  string node_id = 1;
+  TelemetryVector telemetry = 2;
+  int64 timestamp_epoch_ms = 3;
+}
+
+message TelemetryUpdateResponse {
+  bool accepted = 1;
+  uint64 current_sequence = 2;
+}
+
+message SettlementStatusRequest {
+  string tx_id = 1;
+}
+
+message SettlementStatusResponse {
+  SettlementJournalRecord record = 1;
+  bool is_certified = 2;
+  string journal_root_hash = 3;
+}
