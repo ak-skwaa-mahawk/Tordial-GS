@@ -68,7 +68,8 @@ def export_ledger_to_csv(output_path: Path = None) -> Path:
 
         for idx, tx in enumerate(transactions):
             tx_id = tx.get("tx_id", "")
-            epoch_part = tx_id.split("_")[-1] if "_" in tx_id else ""
+            parts = tx_id.split("_")
+            epoch_part = parts[2] if len(parts) > 2 and parts[2].isdigit() else str(int(tx.get("timestamp", 0)))
             hops = tx.get("hops", [])
             allocations = tx.get("allocations", {})
             floor_cut = allocations.get("FLOOR_RESERVE", 0)
