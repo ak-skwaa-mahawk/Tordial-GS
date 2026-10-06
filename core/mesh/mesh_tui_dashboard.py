@@ -92,5 +92,20 @@ def render_dashboard():
 
     print("\n" + "=" * 70)
 
+def run_loop(interval_sec: float = 3.0, max_ticks: int | None = None):
+    ticks = 0
+    try:
+        while max_ticks is None or ticks < max_ticks:
+            render_dashboard()
+            ticks += 1
+            if max_ticks is not None and ticks >= max_ticks:
+                break
+            time.sleep(interval_sec)
+    except KeyboardInterrupt:
+        print("\n[*] Exiting TUI Dashboard.")
+
 if __name__ == "__main__":
-    render_dashboard()
+    if "--watch" in sys.argv:
+        run_loop()
+    else:
+        render_dashboard()
