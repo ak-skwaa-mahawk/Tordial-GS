@@ -25,3 +25,14 @@ Measured across 10,000 routing evaluations over 240 candidate edge nodes:
 
 ### Key Takeaway
 Vectorized matrix projection against the root lattice allows `Tordial-GS` to evaluate full 8D operational telemetry (thermal, queue pressure, link loss, and memory) faster than linear bitwise XOR distance calculations over the same candidate peer set.
+
+## gRPC Transport Performance Profile (ARM64 Loopback)
+Measured over 1,000 operational telemetry frames across the `SovereignMeshService` contract:
+
+| Transport Mode | Throughput (ops/s) | p50 Latency (µs) | p95 Latency (µs) | p99 Latency (µs) | Total Time (1k frames) |
+|---|---|---|---|---|---|
+| **Unary `RouteBurst`** | 205.9 | 5,336.61 | 7,133.90 | 10,673.18 | 4,857.12 ms |
+| **Duplex `StreamRouteBursts`** | **521.6** | **1,311.28** | **5,373.88** | **9,695.54** | **1,917.02 ms** |
+
+### Streaming Advantage
+Persistent HTTP/2 stream multiplexing via `StreamRouteBursts` provides a **2.53× throughput increase** and cuts median end-to-end routing latency from $5.34\ \text{ms}$ down to $1.31\ \text{ms}$, making it the required transport mode for real-time edge telemetry feeds.
