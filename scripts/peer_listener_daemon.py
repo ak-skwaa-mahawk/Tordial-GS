@@ -289,6 +289,12 @@ def run_udp_mesh_listener():
                 pkt = json.loads(data.decode("utf-8", errors="ignore"))
                 if pkt.get("type") == "SYNARA_RAD_HARD_ANCHOR":
                     ingest_synara_anchor(pkt, addr)
+                elif "lyapunov_exp" in pkt or "strain_percent" in pkt:
+                    node = pkt.get("node_id", "UNKNOWN")
+                    strain = pkt.get("strain_percent", 0.0)
+                    vitality = pkt.get("vitality_score", 0.0)
+                    lyap = pkt.get("lyapunov_exp", 0.0)
+                    print(f"[*] [UDP INGEST] Telemetry from {node:<14} | Strain={strain:>5.1f}% | Vit={vitality:.4f} | Lyap={lyap:.3f}", flush=True)
             except Exception:
                 pass
     except Exception as e:
