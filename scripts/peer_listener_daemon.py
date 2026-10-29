@@ -1,3 +1,29 @@
+import ctypes
+import os
+
+# --- Q32.32 libcascade.so Integration ---
+class DecomposedGlyph(ctypes.Structure):
+    _fields_ = [
+        ("carrier_gate", ctypes.c_uint32),
+        ("vertical_pitch", ctypes.c_uint16),
+        ("nasal_resonance", ctypes.c_uint8),
+        ("ejective_impulse", ctypes.c_uint8),
+        ("serial_drag", ctypes.c_uint64),
+    ]
+
+CASCADE_LIB = None
+try:
+    lib_path = os.path.abspath("./libcascade.so")
+    CASCADE_LIB = ctypes.CDLL(lib_path)
+    CASCADE_LIB.cascade_route_hybrid_stream.argtypes = [
+        ctypes.c_char_p, ctypes.c_size_t, ctypes.c_uint64,
+        ctypes.POINTER(DecomposedGlyph), ctypes.c_size_t
+    ]
+    CASCADE_LIB.cascade_route_hybrid_stream.restype = ctypes.c_size_t
+except Exception as e:
+    CASCADE_LIB = None
+# ----------------------------------------
+
 import subprocess
 import socket
 import time
@@ -289,14 +315,22 @@ def run_udp_mesh_listener():
                 pkt = json.loads(data.decode("utf-8", errors="ignore"))
                 if pkt.get("type") == "SYNARA_RAD_HARD_ANCHOR":
                     ingest_synara_anchor(pkt, addr)
+                if "token" in pkt and CASCADE_LIB:
+                    raw_token = pkt["token"].encode('utf-8')
+                    out_buf = (DecomposedGlyph * len(raw_token))()
+                    count = CASCADE_LIB.cascade_route_hybrid_stream(
+                        raw_token, len(raw_token), 0x00418937, out_buf, len(raw_token)
+                    )
+                    ejective = out_buf[1].ejective_impulse if count > 1 else 0
+                    print(f"[+] [ROUTER INGEST] Token: '{pkt['token']}' -> Gates: {count} | Ejective Impulse: {ejective:#04x}", flush=True)
                 elif "lyapunov_exp" in pkt or "strain_percent" in pkt:
                     node = pkt.get("node_id", "UNKNOWN")
                     strain = pkt.get("strain_percent", 0.0)
                     vitality = pkt.get("vitality_score", 0.0)
                     lyap = pkt.get("lyapunov_exp", 0.0)
                     print(f"[*] [UDP INGEST] Telemetry from {node:<14} | Strain={strain:>5.1f}% | Vit={vitality:.4f} | Lyap={lyap:.3f}", flush=True)
-            except Exception:
-                pass
+            except Exception as err:
+                print(f"[!] [UDP EXCEPTION]: {type(err).__name__}: {err}", flush=True)
     except Exception as e:
         print(f"[!] [PEER LISTENER] UDP listener socket failure on port {MESH_UDP_PORT}: {e}", flush=True)
 
