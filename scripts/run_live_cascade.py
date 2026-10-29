@@ -3,6 +3,7 @@ import os
 import time
 import json
 import asyncio
+import websockets
 
 # --- CTYPES STRUCTURE MAPPING ---
 class CascadeNode(ctypes.Structure):
@@ -24,11 +25,16 @@ cascade_lib.init_cascade.restype = None
 cascade_lib.step_cascade_c.argtypes = [ctypes.POINTER(CascadeNode), ctypes.c_uint64]
 cascade_lib.step_cascade_c.restype = None
 
+RUPTURE_LIMIT = 0x1000000000
+
 class LiveCascadeTracker:
     def __init__(self):
         self.node = CascadeNode()
         cascade_lib.init_cascade(ctypes.byref(self.node))
         self.last_ts = time.monotonic()
+        self.accepted = 0
+        self.dropped = 0
+        self.clients = set()
 
     def ingest_packet_flux(self, packet_bytes: bytes) -> dict:
         now = time.monotonic()
@@ -40,39 +46,70 @@ class LiveCascadeTracker:
 
         cascade_lib.step_cascade_c(ctypes.byref(self.node), ctypes.c_uint64(drive_input))
 
+        if self.node.bubble_collapsed:
+            self.dropped += 1
+        else:
+            self.accepted += 1
+
+        # Calculate scalar depth k from scale_omega (shifts relative to 1<<32)
+        omega = self.node.scale_omega
+        depth_k = 0
+        ref = 1 << 32
+        while ref > omega and depth_k < 32:
+            ref >>= 2
+            depth_k += 1
+
+        backpressure = min(1.0, float(self.node.flux_j) / float(RUPTURE_LIMIT))
+
         return {
+            "status": "COAGULATED" if self.node.coagulated else "FLUID",
+            "boundary": "RUPTURED" if self.node.bubble_collapsed else "STABLE",
             "phase_pos": f"0x{self.node.phase_pos:016X}",
             "scale_omega": f"0x{self.node.scale_omega:016X}",
-            "flux_j": f"0x{self.node.flux_j:016X}",
-            "state": "COAGULATED" if self.node.coagulated else "FLUID",
-            "boundary": "RUPTURED" if self.node.bubble_collapsed else "STABLE",
+            "depth_k": depth_k,
+            "backpressure_pct": backpressure,
+            "accepted": self.accepted,
+            "dropped": self.dropped,
             "drive_input": f"0x{drive_input:016X}"
         }
 
-class CascadeProtocol(asyncio.DatagramProtocol):
-    def __init__(self, tracker):
-        self.tracker = tracker
+    async def register_client(self, websocket):
+        self.clients.add(websocket)
+        try:
+            await websocket.wait_closed()
+        finally:
+            self.clients.remove(websocket)
 
+    async def broadcast(self, telemetry: dict):
+        if self.clients:
+            msg = json.dumps(telemetry)
+            await asyncio.gather(*[c.send(msg) for c in self.clients], return_exceptions=True)
+
+tracker = LiveCascadeTracker()
+
+class CascadeProtocol(asyncio.DatagramProtocol):
     def datagram_received(self, data, addr):
-        telemetry = self.tracker.ingest_packet_flux(data)
-        print(f"[{telemetry['state']} | {telemetry['boundary']}] Pos: {telemetry['phase_pos']} | Scale: {telemetry['scale_omega']} | Flux: {telemetry['drive_input']}", flush=True)
+        telemetry = tracker.ingest_packet_flux(data)
+        asyncio.create_task(tracker.broadcast(telemetry))
 
 async def main():
-    tracker = LiveCascadeTracker()
     loop = asyncio.get_running_loop()
 
+    # Bind UDP flux listener on 9998
     transport, _ = await loop.create_datagram_endpoint(
-        lambda: CascadeProtocol(tracker),
+        CascadeProtocol,
         local_addr=("127.0.0.1", 9998)
     )
+    print("[+] UDP Flux Listener bound on 127.0.0.1:9998", flush=True)
 
-    print("[+] Live Cascade Tracker (DatagramProtocol) listening on UDP 127.0.0.1:9998...", flush=True)
-
-    try:
-        while True:
-            await asyncio.sleep(3600)
-    finally:
-        transport.close()
+    # Bind WebSocket broadcast server on 8766
+    async with websockets.serve(tracker.register_client, "127.0.0.1", 8766):
+        print("[+] WebSocket Telemetry Server listening on ws://127.0.0.1:8766", flush=True)
+        try:
+            while True:
+                await asyncio.sleep(3600)
+        finally:
+            transport.close()
 
 if __name__ == "__main__":
     try:
