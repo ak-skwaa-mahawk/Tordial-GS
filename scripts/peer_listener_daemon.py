@@ -322,7 +322,18 @@ def run_udp_mesh_listener():
                         raw_token, len(raw_token), 0x00418937, out_buf, len(raw_token)
                     )
                     ejective = out_buf[1].ejective_impulse if count > 1 else 0
-                    print(f"[+] [ROUTER INGEST] Token: '{pkt['token']}' -> Gates: {count} | Ejective Impulse: {ejective:#04x}", flush=True)
+                    total_drag = sum(out_buf[i].serial_drag for i in range(count))
+                    print(f"[+] [ROUTER INGEST] Token: '{pkt['token']}' -> Gates: {count} | Drag: {total_drag:#x} | Ejective: {ejective:#04x}", flush=True)
+
+                    # Forward acoustic drag into thermodynamic flux listener (UDP 9998)
+                    try:
+                        flux_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                        # Payload encodes gate count, ejective flag, and 64-bit serial drag
+                        flux_payload = int(total_drag & 0xFFFFFFFFFFFFFFFF).to_bytes(8, 'big') + bytes([count, ejective])
+                        flux_sock.sendto(flux_payload, ("127.0.0.1", 9998))
+                        flux_sock.close()
+                    except Exception as fe:
+                        print(f"[!] [FLUX BRIDGE ERR]: {fe}", flush=True)
                 elif "lyapunov_exp" in pkt or "strain_percent" in pkt:
                     node = pkt.get("node_id", "UNKNOWN")
                     strain = pkt.get("strain_percent", 0.0)
