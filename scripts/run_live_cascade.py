@@ -103,7 +103,7 @@ async def main():
     print("[+] UDP Flux Listener bound on 127.0.0.1:9998", flush=True)
 
     # Bind WebSocket broadcast server on 8766
-    async with websockets.serve(tracker.register_client, "127.0.0.1", 8766):
+    async with websockets.serve(tracker.register_client, "0.0.0.0", 8766):
         print("[+] WebSocket Telemetry Server listening on ws://127.0.0.1:8766", flush=True)
         try:
             while True:
